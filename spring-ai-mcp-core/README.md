@@ -47,21 +47,19 @@ ServerParameters params = ServerParameters.builder("npx")
     .build();
 
 // Initialize the async client
-Duration timeout = Duration.ofSeconds(10);
 McpAsyncClient client = McpClient.async(
-    new StdioServerTransport(params), 
-    timeout
+    new StdioServerTransport(params)
 );
 
 // Initialize the connection
-client.initialize()
-    .flatMap(result -> {
+var promptResult = client.initialize()
+    flatMap(result -> {
         // Connection initialized
         return client.listTools(null);
     })
     .flatMap(tools -> {
         // Process tools
-        return client.callTool(new McpSchema.CallToolRequest("echo", 
+        return client.callTool(new McpSchema.CallToolRequest("echo",
             Map.of("message", "Hello MCP!")));
     })
     .flatMap(result -> {
@@ -71,21 +69,23 @@ client.initialize()
     .flatMap(prompts -> {
         // Process available prompts
         return client.getPrompt(new McpSchema.GetPromptRequest("prompt-id"));
-    })
-    .subscribe(prompt -> {
-        // Handle prompt result
     });
 
+// Handle prompt result, e.g. by blocking on it
+McpSchema.GetPromptResult result = promptResult.block();
+
 // Resource management example
-client.listResources(null)
+var resourcesResult = client.listResources(null)
     .flatMap(resources -> {
         // Subscribe to resource changes
         return client.subscribeResource(new McpSchema.SubscribeRequest("resource-uri"));
-    })
-    .subscribe();
+    });
+
+// Handle resources result
+resourcesResult.block();
 
 // Cleanup
-client.closeGracefully(timeout).block();
+client.closeGracefully().block();
 ```
 
 ### Sync Client Example
