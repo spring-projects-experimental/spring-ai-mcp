@@ -132,6 +132,15 @@ public class McpAsyncClient extends DefaultMcpSession {
 	 * Send a tools/list request.
 	 * @return the list of tools result.
 	 */
+	public Mono<McpSchema.ListToolsResult> listTools() {
+		return this.listTools(null);
+	}
+
+	/**
+	 * Send a tools/list request.
+	 * @param cursor the cursor
+	 * @return the list of tools result.
+	 */
 	public Mono<McpSchema.ListToolsResult> listTools(String cursor) {
 		return this.sendRequest("tools/list", new McpSchema.PaginatedRequest(cursor), LIST_TOOLS_RESULT_TYPE_REF);
 	}
@@ -148,6 +157,14 @@ public class McpAsyncClient extends DefaultMcpSession {
 
 	private static TypeReference<McpSchema.ListResourceTemplatesResult> LIST_RESOURCE_TEMPLATES_RESULT_TYPE_REF = new TypeReference<McpSchema.ListResourceTemplatesResult>() {
 	};
+
+	/**
+	 * Send a resources/list request.
+	 * @return the list of resources result.
+	 */
+	public Mono<McpSchema.ListResourcesResult> listResources() {
+		return this.listResources(null);
+	}
 
 	/**
 	 * Send a resources/list request.
@@ -175,6 +192,17 @@ public class McpAsyncClient extends DefaultMcpSession {
 	 */
 	public Mono<McpSchema.ReadResourceResult> readResource(McpSchema.ReadResourceRequest readResourceRequest) {
 		return this.sendRequest("resources/read", readResourceRequest, READ_RESOURCE_RESULT_TYPE_REF);
+	}
+
+	/**
+	 * Resource templates allow servers to expose parameterized resources using URI
+	 * templates. Arguments may be auto-completed through the completion API.
+	 *
+	 * Request a list of resource templates the server has.
+	 * @return the list of resource templates result.
+	 */
+	public Mono<McpSchema.ListResourceTemplatesResult> listResourceTemplates() {
+		return this.listResourceTemplates(null);
 	}
 
 	/**
@@ -229,10 +257,28 @@ public class McpAsyncClient extends DefaultMcpSession {
 	private static TypeReference<McpSchema.GetPromptResult> GET_PROMPT_RESULT_TYPE_REF = new TypeReference<McpSchema.GetPromptResult>() {
 	};
 
+	/**
+	 * List all available prompts.
+	 * @return the list of prompts result.
+	 */
+	public Mono<ListPromptsResult> listPrompts() {
+		return this.listPrompts(null);
+	}
+
+	/**
+	 * List all available prompts.
+	 * @param cursor the cursor
+	 * @return the list of prompts result.
+	 */
 	public Mono<ListPromptsResult> listPrompts(String cursor) {
 		return this.sendRequest("prompts/list", new PaginatedRequest(cursor), LIST_PROMPTS_RESULT_TYPE_REF);
 	}
 
+	/**
+	 * Get a prompt by its id.
+	 * @param getPromptRequest the get prompt request.
+	 * @return the get prompt result.
+	 */
 	public Mono<GetPromptResult> getPrompt(GetPromptRequest getPromptRequest) {
 		return this.sendRequest("prompts/get", getPromptRequest, GET_PROMPT_RESULT_TYPE_REF);
 	}
