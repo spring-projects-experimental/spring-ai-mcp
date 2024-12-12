@@ -44,7 +44,7 @@ public class McpSyncClient implements AutoCloseable {
 
 	@Override
 	public void close() {
-		this.delegate.closeGracefully(Duration.ofMillis(DEFAULT_CLOSE_TIMEOUT_MS)).block();
+		this.delegate.closeGracefully().block(Duration.ofMillis(DEFAULT_CLOSE_TIMEOUT_MS));
 	}
 
 	/**

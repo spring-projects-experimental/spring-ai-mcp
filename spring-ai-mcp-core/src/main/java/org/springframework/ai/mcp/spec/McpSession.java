@@ -81,15 +81,14 @@ public interface McpSession {
 	Mono<Void> sendNotification(String method, Map<String, Object> params);
 
 	/**
-	 * Gracefully closes the session with a specified timeout.
-	 *
-	 * <p>
-	 * This method attempts to close the session cleanly, waiting for any pending
-	 * operations to complete up to the specified timeout duration.
-	 * </p>
-	 * @param timeout the maximum duration to wait for the session to close
-	 * @return a Mono that completes when the session has been closed
+	 * Closes the session and releases any associated resources asynchronously.
+	 * @return a {@link Mono<Void>} that completes when the session has been closed.
 	 */
-	Mono<Void> closeGracefully(Duration timeout);
+	Mono<Void> closeGracefully();
+
+	/**
+	 * Closes the session and releases any associated resources.
+	 */
+	void close();
 
 }

@@ -43,8 +43,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Unit tests for MCP Client Session functionality.
  *
  * @author Christian Tzolov
- * @since 1.0.0
+ * @author Dariusz Jędrzejczyk
  */
+@Timeout(15) // Giving extra time beyond the client timeout
 class McpSyncClientTests {
 
 	private McpSyncClient mcpSyncClient;
@@ -87,7 +88,6 @@ class McpSyncClientTests {
 	}
 
 	@Test
-	@Timeout(15) // Giving extra time beyond the client timeout
 	void testListTools() {
 		ListToolsResult tools = mcpSyncClient.listTools(null);
 
@@ -101,7 +101,6 @@ class McpSyncClientTests {
 	}
 
 	@Test
-	@Timeout(15) // Giving extra time beyond the client timeout
 	void testCallTools() {
 		CallToolResult toolResult = mcpSyncClient.callTool(new CallToolRequest("add", Map.of("a", 3, "b", 4)));
 
@@ -120,13 +119,11 @@ class McpSyncClientTests {
 	}
 
 	@Test
-	@Timeout(15)
 	void testPing() {
 		assertThatCode(() -> mcpSyncClient.ping()).doesNotThrowAnyException();
 	}
 
 	@Test
-	@Timeout(15)
 	void testCallTool() {
 		CallToolRequest callToolRequest = new CallToolRequest("echo", Map.of("message", TEST_MESSAGE));
 
@@ -139,7 +136,6 @@ class McpSyncClientTests {
 	}
 
 	@Test
-	@Timeout(15)
 	void testCallToolWithInvalidTool() {
 		CallToolRequest invalidRequest = new CallToolRequest("nonexistent_tool", Map.of("message", TEST_MESSAGE));
 
@@ -147,13 +143,11 @@ class McpSyncClientTests {
 	}
 
 	@Test
-	@Timeout(15)
 	void testRootsListChanged() {
 		assertThatCode(() -> mcpSyncClient.sendRootsListChanged()).doesNotThrowAnyException();
 	}
 
 	@Test
-	@Timeout(15)
 	void testListResources() {
 		ListResourcesResult resources = mcpSyncClient.listResources(null);
 

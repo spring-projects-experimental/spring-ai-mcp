@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -87,6 +88,11 @@ public class StdioServerTransport extends AbstractMcpTransport {
 
 	@Override
 	public void start() {
+		// Let's kick off the abstraction layer that will consume the logical messages
+		// pushed via sinks. The code that follows is actually feeding the sinks with
+		// data.
+		super.start();
+
 		// Prepare command and environment
 		List<String> fullCommand = new ArrayList<>();
 		fullCommand.add(params.getCommand());
@@ -234,39 +240,43 @@ public class StdioServerTransport extends AbstractMcpTransport {
 
 		this.isRunning = false;
 
-		return Mono.whenDelayError(Mono.fromRunnable(() -> {
+		return Mono.fromFuture(() -> {
+			System.out.println("Sending TERM to process");
+			if (this.process != null) {
+				this.process.destroy();
+				return process.onExit();
+			}
+			else {
+				return CompletableFuture.failedFuture(new RuntimeException("Process not started"));
+			}
+		}).doOnNext(process -> {
+			if (process.exitValue() != 0) {
+				System.out.println("Process terminated with code " + process.exitValue());
+			}
+		}).then(Mono.whenDelayError(Mono.fromRunnable(() -> {
 			try {
 				this.processErrorReader.close();
 			}
 			catch (IOException e) {
 				throw new RuntimeException(e);
 			}
-		}).subscribeOn(errorScheduler), Mono.fromRunnable(() -> {
+		}), Mono.fromRunnable(() -> {
 			try {
 				this.processReader.close();
 			}
 			catch (IOException e) {
 				throw new RuntimeException(e);
 			}
-		}).subscribeOn(inboundScheduler), Mono.fromRunnable(() -> {
+		}), Mono.fromRunnable(() -> {
 			try {
 				this.processWriter.close();
 			}
 			catch (IOException e) {
 				throw new RuntimeException(e);
 			}
-		}).subscribeOn(outboundScheduler))
+		})))
 			.then(Mono.whenDelayError(inboundScheduler.disposeGracefully(), outboundScheduler.disposeGracefully(),
 					errorScheduler.disposeGracefully()))
-			.then(Mono.fromRunnable(() -> {
-				if (this.process != null) {
-					var process = this.process.destroyForcibly();
-					if (process.exitValue() != 0) {
-						throw new RuntimeException("Failed to destroy process");
-					}
-				}
-			}))
-			.then()
 			.subscribeOn(Schedulers.boundedElastic());
 	}
 

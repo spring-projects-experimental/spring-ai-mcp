@@ -91,7 +91,7 @@ public interface McpTransport {
 	 * @param inboundMessageHandler a consumer that processes incoming
 	 * {@link JSONRPCMessage}s
 	 */
-	void setInboudMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler);
+	void setInboundMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler);
 
 	/**
 	 * Sets the handler for processing transport-level errors.

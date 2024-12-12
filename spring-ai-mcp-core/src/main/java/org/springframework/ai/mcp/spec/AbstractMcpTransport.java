@@ -29,6 +29,9 @@ import org.springframework.ai.mcp.spec.McpSchema.JSONRPCMessage;
  * @author Christian Tzolov
  * @author Dariusz Jędrzejczyk
  */
+// TODO: The API is not finalized. Implementing SSE will dictate a more concrete
+// structure and relationship between the base and the actual implementation including
+// proper encapsulation and state management.
 public abstract class AbstractMcpTransport implements McpTransport {
 
 	protected final ObjectMapper objectMapper;
@@ -53,17 +56,9 @@ public abstract class AbstractMcpTransport implements McpTransport {
 		Assert.notNull(objectMapper, "ObjectMapper must not be null");
 		this.objectMapper = objectMapper;
 
-		// TODO: consider the effects of buffering here -> the inter-process pipes are
-		// independent and the notifications can flood the client/server.
-		// Potentially, the interest in reading could be communicated from one party
-		// to the other so the Blocking IO Threads can pause consuming the stream
-		// buffers when there is no expectation for reading.
-
 		this.errorSink = Sinks.many().unicast().onBackpressureBuffer();
 		this.inboundSink = Sinks.many().unicast().onBackpressureBuffer();
 		this.outboundSink = Sinks.many().unicast().onBackpressureBuffer();
-
-		this.handleIncomingMessages();
 	}
 
 	public ObjectMapper getObjectMapper() {
@@ -77,7 +72,6 @@ public abstract class AbstractMcpTransport implements McpTransport {
 	private void handleIncomingErrors() {
 		this.errorSink.asFlux().subscribe(e -> {
 			this.errorHandler.accept(e);
-			// System.err.println(e); TODO: log the error
 		});
 	}
 
@@ -93,7 +87,7 @@ public abstract class AbstractMcpTransport implements McpTransport {
 		return errorSink;
 	}
 
-	public void setInboudMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler) {
+	public void setInboundMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler) {
 		this.inboundMessageHandler = inboundMessageHandler;
 	}
 

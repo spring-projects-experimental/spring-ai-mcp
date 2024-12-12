@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.client.stdio.ServerParameters;
 import org.springframework.ai.mcp.client.stdio.StdioServerTransport;
@@ -41,8 +42,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Unit tests for MCP Client Session functionality.
  *
  * @author Christian Tzolov
- * @since 1.0.0
+ * @author Dariusz Jędrzejczyk
  */
+@Timeout(15) // Giving extra time beyond the client timeout
 class McpAsyncClientTests {
 
 	private McpAsyncClient mcpAsyncClient;
@@ -61,15 +63,16 @@ class McpAsyncClientTests {
 
 		assertThatCode(() -> {
 			mcpAsyncClient = McpClient.async(new StdioServerTransport(stdioParams), TIMEOUT, new ObjectMapper());
-			mcpAsyncClient.initialize();
+			mcpAsyncClient.initialize().block(Duration.ofSeconds(10));
 		}).doesNotThrowAnyException();
 	}
 
 	@AfterEach
 	void tearDown() {
-		// if (mcpSyncClient != null) {
-		// assertThatCode(() -> mcpSyncClient.close()).doesNotThrowAnyException();
-		// }
+		if (mcpAsyncClient != null) {
+			assertThatCode(() -> mcpAsyncClient.closeGracefully().block(Duration.ofSeconds(10)))
+				.doesNotThrowAnyException();
+		}
 	}
 
 	@Test
@@ -85,38 +88,34 @@ class McpAsyncClientTests {
 	}
 
 	@Test
-	@Timeout(15) // Giving extra time beyond the client timeout
 	void testListTools() {
-		mcpAsyncClient.listTools(null).subscribe(result -> {
+		StepVerifier.create(mcpAsyncClient.listTools(null)).consumeNextWith(result -> {
 			assertThat(result.tools()).isNotNull().isNotEmpty();
 
 			Tool firstTool = result.tools().get(0);
 			assertThat(firstTool.name()).isNotNull();
 			assertThat(firstTool.description()).isNotNull();
-		});
+		}).verifyComplete();
 	}
 
 	@Test
-	@Timeout(15)
 	void testPing() {
 		assertThatCode(() -> mcpAsyncClient.ping().block()).doesNotThrowAnyException();
 	}
 
 	@Test
-	@Timeout(15)
 	void testCallTool() {
 		CallToolRequest callToolRequest = new CallToolRequest("echo", Map.of("message", TEST_MESSAGE));
 
-		mcpAsyncClient.callTool(callToolRequest).subscribe(callToolResult -> {
+		StepVerifier.create(mcpAsyncClient.callTool(callToolRequest)).consumeNextWith(callToolResult -> {
 			assertThat(callToolResult).isNotNull().satisfies(result -> {
 				assertThat(result.content()).isNotNull();
 				assertThat(result.isError()).isNull();
 			});
-		});
+		}).verifyComplete();
 	}
 
 	@Test
-	@Timeout(15)
 	void testCallToolWithInvalidTool() {
 		CallToolRequest invalidRequest = new CallToolRequest("nonexistent_tool", Map.of("message", TEST_MESSAGE));
 
@@ -124,15 +123,13 @@ class McpAsyncClientTests {
 	}
 
 	@Test
-	@Timeout(15)
 	void testRootsListChanged() {
 		assertThatCode(() -> mcpAsyncClient.sendRootsListChanged().block()).doesNotThrowAnyException();
 	}
 
 	@Test
-	@Timeout(15)
 	void testListResources() {
-		mcpAsyncClient.listResources(null).subscribe(resources -> {
+		StepVerifier.create(mcpAsyncClient.listResources(null)).consumeNextWith(resources -> {
 			assertThat(resources).isNotNull().satisfies(result -> {
 				assertThat(result.resources()).isNotNull();
 
@@ -142,7 +139,7 @@ class McpAsyncClientTests {
 					assertThat(firstResource.name()).isNotNull();
 				}
 			});
-		});
+		}).verifyComplete();
 	}
 
 	@Test
@@ -151,9 +148,8 @@ class McpAsyncClientTests {
 	}
 
 	@Test
-	@Timeout(15)
 	void testListPrompts() {
-		mcpAsyncClient.listPrompts(null).subscribe(prompts -> {
+		StepVerifier.create(mcpAsyncClient.listPrompts(null)).consumeNextWith(prompts -> {
 			assertThat(prompts).isNotNull().satisfies(result -> {
 				assertThat(result.prompts()).isNotNull();
 
@@ -163,18 +159,19 @@ class McpAsyncClientTests {
 					assertThat(firstPrompt.description()).isNotNull();
 				}
 			});
-		});
+		}).verifyComplete();
 	}
 
 	@Test
-	@Timeout(15)
 	void testGetPrompt() {
-		mcpAsyncClient.getPrompt(new GetPromptRequest("simple_prompt", Map.of())).subscribe(prompt -> {
-			assertThat(prompt).isNotNull().satisfies(result -> {
-				assertThat(result.description()).isNotNull();
-				assertThat(result.messages()).isNotEmpty();
-			});
-		});
+		StepVerifier.create(mcpAsyncClient.getPrompt(new GetPromptRequest("simple_prompt", Map.of())))
+			.consumeNextWith(prompt -> {
+				assertThat(prompt).isNotNull().satisfies(result -> {
+					assertThat(result.messages()).isNotEmpty();
+					assertThat(result.messages()).hasSize(1);
+				});
+			})
+			.verifyComplete();
 	}
 
 }

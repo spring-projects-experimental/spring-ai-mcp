@@ -42,7 +42,7 @@ class DefaultMcpTransportTests {
 		transport = new AbstractMcpTransport(objectMapper) {
 			@Override
 			public Mono<Void> closeGracefully() {
-				return null;
+				return Mono.empty();
 			}
 		};
 	}
@@ -93,7 +93,7 @@ class DefaultMcpTransportTests {
 	@Test
 	void customInboundMessageHandlerShouldReceiveMessages() {
 		AtomicReference<JSONRPCMessage> receivedMessage = new AtomicReference<>();
-		transport.setInboudMessageHandler(receivedMessage::set);
+		transport.setInboundMessageHandler(receivedMessage::set);
 		transport.start();
 
 		JSONRPCRequest message = new JSONRPCRequest("2.0", "test", 1, null);
@@ -123,7 +123,7 @@ class DefaultMcpTransportTests {
 		AtomicReference<JSONRPCMessage> receivedMessage = new AtomicReference<>();
 		AtomicReference<String> receivedError = new AtomicReference<>();
 
-		transport.setInboudMessageHandler(receivedMessage::set);
+		transport.setInboundMessageHandler(receivedMessage::set);
 		transport.setInboundErrorHandler(receivedError::set);
 		transport.start();
 

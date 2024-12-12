@@ -166,13 +166,23 @@ public class McpSchema {
 	// Existing Enums and Base Types (from previous implementation)
 	public enum Role {
 
-		USER, ASSISTANT
+		@JsonProperty("user")
+		USER, @JsonProperty("assistant")
+		ASSISTANT
 
 	}
 
 	public enum LoggingLevel {
 
-		DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY
+		@JsonProperty("debug")
+		DEBUG, @JsonProperty("info")
+		INFO, @JsonProperty("notice")
+		NOTICE, @JsonProperty("warning")
+		WARNING, @JsonProperty("error")
+		ERROR, @JsonProperty("critical")
+		CRITICAL, @JsonProperty("alert")
+		ALERT, @JsonProperty("emergency")
+		EMERGENCY
 
 	}
 
