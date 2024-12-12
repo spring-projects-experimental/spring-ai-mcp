@@ -38,6 +38,40 @@ Detailed UML class diagrams showing the relationships between components can be 
 
 ## Usage
 
+### Sync Client Example
+
+```java
+// Create and initialize sync client
+ServerParameters params = ServerParameters.builder("npx")
+    .args("-y", "@modelcontextprotocol/server-everything", "dir")
+    .build();
+
+try (McpSyncClient client = McpClient.sync(new StdioServerTransport(params))) {
+    // Initialize connection
+    McpSchema.InitializeResult initResult = client.initialize();
+
+    // List tools synchronously
+    McpSchema.ListToolsResult tools = client.listTools(null);
+
+    // Call tool synchronously
+    McpSchema.CallToolResult result = client.callTool(
+        new McpSchema.CallToolRequest("echo", Map.of("message", "Hello!"))
+    );
+
+    // Resource management
+    McpSchema.ListResourcesResult resources = client.listResources(null);
+    McpSchema.ReadResourceResult resource = client.readResource(
+        new McpSchema.ReadResourceRequest("resource-uri")
+    );
+
+    // Prompt management
+    ListPromptsResult prompts = client.listPrompts(null);
+    GetPromptResult prompt = client.getPrompt(
+        new McpSchema.GetPromptRequest("prompt-id", Map.of())
+    );
+}
+```
+
 ### Async Client Example
 
 ```java
@@ -68,7 +102,7 @@ var promptResult = client.initialize()
     })
     .flatMap(prompts -> {
         // Process available prompts
-        return client.getPrompt(new McpSchema.GetPromptRequest("prompt-id"));
+        return client.getPrompt(new McpSchema.GetPromptRequest("prompt-id", Map.of()));
     });
 
 // Handle prompt result, e.g. by blocking on it
@@ -86,44 +120,6 @@ resourcesResult.block();
 
 // Cleanup
 client.closeGracefully().block();
-```
-
-### Sync Client Example
-
-```java
-// Create and initialize sync client
-McpSyncClient client = McpClient.sync(
-    new StdioServerTransport(params),
-    timeout
-);
-
-try {
-    // Initialize connection
-    McpSchema.InitializeResult initResult = client.initialize();
-
-    // List tools synchronously
-    McpSchema.ListToolsResult tools = client.listTools(null);
-
-    // Call tool synchronously
-    McpSchema.CallToolResult result = client.callTool(
-        new McpSchema.CallToolRequest("echo", Map.of("message", "Hello!"))
-    );
-
-    // Resource management
-    McpSchema.ListResourcesResult resources = client.listResources(null);
-    McpSchema.ReadResourceResult resource = client.readResource(
-        new McpSchema.ReadResourceRequest("resource-uri")
-    );
-
-    // Prompt management
-    ListPromptsResult prompts = client.listPrompts(null);
-    GetPromptResult prompt = client.getPrompt(
-        new McpSchema.GetPromptRequest("prompt-id")
-    );
-} finally {
-    // Cleanup
-    client.close();
-}
 ```
 
 ## Architecture
