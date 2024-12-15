@@ -650,11 +650,33 @@ public class McpSchema {
 		}
 	}
 
+	// ---------------------------
 	// Roots
+	// ---------------------------
+	/**
+	 * Represents a root directory or file that the server can operate on.
+	 *
+	 * @param uri The URI identifying the root. This *must* start with file:// for now.
+	 * This restriction may be relaxed in future versions of the protocol to allow other
+	 * URI schemes.
+	 * @param name An optional name for the root. This can be used to provide a
+	 * human-readable identifier for the root, which may be useful for display purposes or
+	 * for referencing the root in other parts of the application.
+	 */
 	@JsonInclude(JsonInclude.Include.NON_ABSENT)
 	public record Root( // @formatter:off
 		@JsonProperty("uri") String uri,
 		@JsonProperty("name") String name) {
+	} // @formatter:on
+
+	/**
+	 * The client's response to a roots/list request from the server. This result contains
+	 * an array of Root objects, each representing a root directory or file that the
+	 * server can operate on.
+	 */
+	@JsonInclude(JsonInclude.Include.NON_ABSENT)
+	public record ListRootsResult( // @formatter:off
+		@JsonProperty("roots") List<Root> roots) {
 	} // @formatter:on
 
 }

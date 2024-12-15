@@ -19,6 +19,8 @@ import java.time.Duration;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import org.springframework.ai.mcp.spec.DefaultMcpSession;
@@ -35,6 +37,8 @@ import org.springframework.ai.mcp.spec.McpTransport;
  * @author Christian Tzolov
  */
 public class McpAsyncClient extends DefaultMcpSession {
+
+	private final static Logger logger = LoggerFactory.getLogger(McpAsyncClient.class);
 
 	private static TypeReference<Void> VOID_TYPE_REFERENCE = new TypeReference<>() {
 	};
@@ -86,6 +90,11 @@ public class McpAsyncClient extends DefaultMcpSession {
 				});
 
 		return result.flatMap(initializeResult -> {
+
+			logger.info("Server response with Protocol: {}, Capabilities: {}, Info: {} and Instructions {}",
+					initializeResult.protocolVersion(), initializeResult.capabilities(), initializeResult.serverInfo(),
+					initializeResult.instructions());
+
 			if (!McpSchema.LATEST_PROTOCOL_VERSION.equals(initializeResult.protocolVersion())) {
 				return Mono.error(new McpError(
 						"Unsupported protocol version from the server: " + initializeResult.protocolVersion()));

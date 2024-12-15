@@ -75,7 +75,7 @@
 		<slf4j-api.version>2.0.16</slf4j-api.version>
 		<logback.version>1.5.12</logback.version>
 		<jackson.version>2.18.2</jackson.version>
-		<springframework.version>6.1.13</springframework.version>
+		<springframework.version>6.2.1</springframework.version>
 
 		<!-- plugin versions -->
 		<maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>

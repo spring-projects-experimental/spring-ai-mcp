@@ -25,7 +25,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.testcontainers.containers.GenericContainer;
@@ -46,7 +45,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @author Christian Tzolov
  */
-@Disabled
 @Timeout(15)
 class SseServerTransportTests {
 
@@ -66,9 +64,6 @@ class SseServerTransportTests {
 
 	// Test class to access protected methods
 	static class TestSseServerTransport extends SseServerTransport {
-
-		// private final Sinks.Many<String> endpointSink =
-		// Sinks.many().replay().latest();
 
 		private final AtomicInteger inboundMessageCount = new AtomicInteger(0);
 
@@ -144,7 +139,6 @@ class SseServerTransportTests {
 			.hasMessageContaining("ObjectMapper must not be null");
 	}
 
-	@Disabled
 	@Test
 	void testMessageProcessing() {
 		// Create a test message
@@ -167,7 +161,6 @@ class SseServerTransportTests {
 		assertThat(transport.getInboundMessageCount()).isEqualTo(1);
 	}
 
-	@Disabled
 	@Test
 	void testResponseMessageProcessing() {
 		// Simulate receiving a response message
@@ -189,7 +182,6 @@ class SseServerTransportTests {
 		assertThat(transport.getInboundMessageCount()).isEqualTo(1);
 	}
 
-	@Disabled
 	@Test
 	void testErrorMessageProcessing() {
 		// Simulate receiving an error message
@@ -214,7 +206,6 @@ class SseServerTransportTests {
 		assertThat(transport.getInboundMessageCount()).isEqualTo(1);
 	}
 
-	@Disabled
 	@Test
 	void testNotificationMessageProcessing() {
 		// Simulate receiving a notification message (no id)
@@ -246,7 +237,6 @@ class SseServerTransportTests {
 		assertThat(transport.getInboundMessageCount()).isEqualTo(0);
 	}
 
-	@Disabled
 	@Test
 	void testRetryBehavior() {
 		// Create a WebClient that simulates connection failures
@@ -261,7 +251,6 @@ class SseServerTransportTests {
 		failingTransport.closeGracefully().block();
 	}
 
-	@Disabled
 	@Test
 	void testMultipleMessageProcessing() {
 		// Simulate receiving multiple messages in sequence
@@ -297,7 +286,6 @@ class SseServerTransportTests {
 		assertThat(transport.getInboundMessageCount()).isEqualTo(2);
 	}
 
-	@Disabled
 	@Test
 	void testMessageOrderPreservation() {
 		// Simulate receiving messages in a specific order
