@@ -94,17 +94,6 @@ public interface McpTransport {
 	void setInboundMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler);
 
 	/**
-	 * Sets the handler for processing transport-level errors.
-	 *
-	 * <p>
-	 * The provided handler will be called when errors occur during transport operations,
-	 * such as connection failures or protocol violations.
-	 * </p>
-	 * @param inboundErrorHandler a consumer that processes error messages
-	 */
-	void setInboundErrorHandler(Consumer<String> inboundErrorHandler);
-
-	/**
 	 * Sends a message to the server asynchronously.
 	 *
 	 * <p>

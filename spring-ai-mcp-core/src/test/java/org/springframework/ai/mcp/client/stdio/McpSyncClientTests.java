@@ -16,9 +16,14 @@
 
 package org.springframework.ai.mcp.client.stdio;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import org.springframework.ai.mcp.client.AbstractMcpSyncClientTests;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for the {@link McpSyncClient} with {@link StdioServerTransport}.
@@ -35,6 +40,18 @@ class McpSyncClientTests extends AbstractMcpSyncClientTests {
 			.args("-y", "@modelcontextprotocol/server-everything", "dir")
 			.build();
 		this.mcpTransport = new StdioServerTransport(stdioParams);
+	}
+
+	@Test
+	void customErrorHandlerShouldReceiveErrors() {
+		AtomicReference<String> receivedError = new AtomicReference<>();
+		((StdioServerTransport) mcpTransport).setInboundErrorHandler(receivedError::set);
+		mcpTransport.start();
+
+		String errorMessage = "Test error";
+		((StdioServerTransport) mcpTransport).getErrorSink().tryEmitNext(errorMessage);
+
+		assertThat(receivedError.get()).isNotNull().isEqualTo(errorMessage);
 	}
 
 	@Override

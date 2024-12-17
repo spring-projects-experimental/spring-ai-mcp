@@ -167,8 +167,6 @@ public class DefaultMcpSession implements McpSession {
 			}
 		});
 
-		this.transport.setInboundErrorHandler(error -> logger.error("Error received: {}", error));
-
 		this.transport.start();
 	}
 

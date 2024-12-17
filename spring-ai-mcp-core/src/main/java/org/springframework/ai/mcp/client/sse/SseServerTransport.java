@@ -109,7 +109,7 @@ public class SseServerTransport extends AbstractMcpTransport {
 	 * ObjectMapper for serializing outbound messages and deserializing inbound messages.
 	 * Handles conversion between JSON-RPC messages and their string representation.
 	 */
-	private ObjectMapper objectMapper;
+	protected ObjectMapper objectMapper;
 
 	/**
 	 * Dedicated scheduler for processing outbound messages. Ensures sequential processing

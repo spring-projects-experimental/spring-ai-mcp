@@ -24,11 +24,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -52,6 +54,8 @@ public class StdioServerTransport extends AbstractMcpTransport {
 	/** The server process being communicated with */
 	private Process process;
 
+	private ObjectMapper objectMapper;
+
 	/** Scheduler for handling inbound messages from the server process */
 	private Scheduler inboundScheduler;
 
@@ -63,6 +67,10 @@ public class StdioServerTransport extends AbstractMcpTransport {
 
 	/** Parameters for configuring and starting the server process */
 	private final ServerParameters params;
+
+	private final Sinks.Many<String> errorSink;
+
+	private Consumer<String> errorHandler = error -> logger.error("Error received: {}", error);
 
 	/**
 	 * Creates a new StdioServerTransport with the specified parameters and default
@@ -79,12 +87,14 @@ public class StdioServerTransport extends AbstractMcpTransport {
 	 * @param objectMapper The ObjectMapper to use for JSON serialization/deserialization
 	 */
 	public StdioServerTransport(ServerParameters params, ObjectMapper objectMapper) {
-		super(objectMapper);
-
 		Assert.notNull(params, "The params can not be null");
 		Assert.notNull(objectMapper, "The ObjectMapper can not be null");
 
 		this.params = params;
+
+		this.objectMapper = objectMapper;
+
+		this.errorSink = Sinks.many().unicast().onBackpressureBuffer();
 
 		// Start threads
 		this.inboundScheduler = Schedulers.fromExecutorService(Executors.newSingleThreadExecutor(), "inbound");
@@ -105,6 +115,8 @@ public class StdioServerTransport extends AbstractMcpTransport {
 		// pushed via sinks. The code that follows is actually feeding the sinks with
 		// data.
 		super.start();
+
+		handleIncomingErrors();
 
 		// Prepare command and environment
 		List<String> fullCommand = new ArrayList<>();
@@ -145,6 +157,19 @@ public class StdioServerTransport extends AbstractMcpTransport {
 	}
 
 	/**
+	 * Sets the handler for processing transport-level errors.
+	 *
+	 * <p>
+	 * The provided handler will be called when errors occur during transport operations,
+	 * such as connection failures or protocol violations.
+	 * </p>
+	 * @param errorHandler a consumer that processes error messages
+	 */
+	public void setInboundErrorHandler(Consumer<String> errorHandler) {
+		this.errorHandler = errorHandler;
+	}
+
+	/**
 	 * Waits for the server process to exit.
 	 * @throws RuntimeException if the process is interrupted while waiting
 	 */
@@ -170,7 +195,7 @@ public class StdioServerTransport extends AbstractMcpTransport {
 					try {
 						logger.error("Received error line: {}", line);
 						// TODO: handle errors, etc.
-						this.getErrorSink().tryEmitNext(line);
+						this.errorSink.tryEmitNext(line);
 					}
 					catch (Exception e) {
 						throw new RuntimeException(e);
@@ -180,6 +205,12 @@ public class StdioServerTransport extends AbstractMcpTransport {
 			catch (IOException e) {
 				throw new RuntimeException(e);
 			}
+		});
+	}
+
+	private void handleIncomingErrors() {
+		this.errorSink.asFlux().subscribe(e -> {
+			this.errorHandler.accept(e);
 		});
 	}
 
@@ -266,6 +297,10 @@ public class StdioServerTransport extends AbstractMcpTransport {
 			errorScheduler.dispose();
 			outboundScheduler.dispose();
 		})).then().subscribeOn(Schedulers.boundedElastic());
+	}
+
+	public Sinks.Many<String> getErrorSink() {
+		return this.errorSink;
 	}
 
 }

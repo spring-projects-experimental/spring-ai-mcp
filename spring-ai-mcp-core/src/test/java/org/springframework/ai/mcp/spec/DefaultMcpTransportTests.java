@@ -34,43 +34,14 @@ class DefaultMcpTransportTests {
 
 	private AbstractMcpTransport transport;
 
-	private ObjectMapper objectMapper;
-
 	@BeforeEach
 	void setUp() {
-		objectMapper = new ObjectMapper();
-		transport = new AbstractMcpTransport(objectMapper) {
+		transport = new AbstractMcpTransport() {
 			@Override
 			public Mono<Void> closeGracefully() {
 				return Mono.empty();
 			}
 		};
-	}
-
-	@Test
-	void constructorShouldValidateObjectMapper() {
-		assertThatThrownBy(() -> new AbstractMcpTransport(null) {
-			@Override
-			public Mono<Void> closeGracefully() {
-				return null;
-			}
-		}).isInstanceOf(IllegalArgumentException.class).hasMessage("ObjectMapper must not be null");
-	}
-
-	@Test
-	void defaultConstructorShouldCreateValidInstance() {
-		AbstractMcpTransport defaultTransport = new AbstractMcpTransport() {
-			@Override
-			public Mono<Void> closeGracefully() {
-				return null;
-			}
-		};
-		assertThat(defaultTransport.getObjectMapper()).isNotNull();
-	}
-
-	@Test
-	void customObjectMapperConstructorShouldCreateValidInstance() {
-		assertThat(transport.getObjectMapper()).isSameAs(objectMapper);
 	}
 
 	@Test
@@ -107,24 +78,10 @@ class DefaultMcpTransportTests {
 	}
 
 	@Test
-	void customErrorHandlerShouldReceiveErrors() {
-		AtomicReference<String> receivedError = new AtomicReference<>();
-		transport.setInboundErrorHandler(receivedError::set);
-		transport.start();
-
-		String errorMessage = "Test error";
-		transport.getErrorSink().tryEmitNext(errorMessage);
-
-		assertThat(receivedError.get()).isNotNull().isEqualTo(errorMessage);
-	}
-
-	@Test
-	void startShouldInitializeMessageAndErrorHandling() {
+	void startShouldInitializeMessage() {
 		AtomicReference<JSONRPCMessage> receivedMessage = new AtomicReference<>();
-		AtomicReference<String> receivedError = new AtomicReference<>();
 
 		transport.setInboundMessageHandler(receivedMessage::set);
-		transport.setInboundErrorHandler(receivedError::set);
 		transport.start();
 
 		JSONRPCRequest message = new JSONRPCRequest("2.0", "test", 1, null);
@@ -132,10 +89,8 @@ class DefaultMcpTransportTests {
 		String errorMessage = "Test error";
 
 		transport.getInboundSink().tryEmitNext(message);
-		transport.getErrorSink().tryEmitNext(errorMessage);
 
 		assertThat(receivedMessage.get()).isNotNull();
-		assertThat(receivedError.get()).isEqualTo(errorMessage);
 	}
 
 	@Test

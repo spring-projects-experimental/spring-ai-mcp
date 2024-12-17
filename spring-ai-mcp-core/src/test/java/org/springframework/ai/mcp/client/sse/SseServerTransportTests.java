@@ -21,9 +21,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -87,7 +85,7 @@ class SseServerTransportTests {
 
 		public void simulateMessageEvent(String jsonMessage) {
 			try {
-				McpSchema.JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(getObjectMapper(), jsonMessage);
+				McpSchema.JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(this.objectMapper, jsonMessage);
 				getInboundSink().tryEmitNext(message);
 				inboundMessageCount.incrementAndGet();
 			}

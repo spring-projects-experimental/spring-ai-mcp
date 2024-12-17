@@ -18,7 +18,6 @@ package org.springframework.ai.mcp.spec;
 
 import java.util.function.Consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -38,44 +37,19 @@ public abstract class AbstractMcpTransport implements McpTransport {
 
 	private static final Logger logger = LoggerFactory.getLogger(AbstractMcpTransport.class);
 
-	protected final ObjectMapper objectMapper;
-
-	private final Sinks.Many<String> errorSink;
-
 	private final Sinks.Many<JSONRPCMessage> inboundSink;
 
 	private final Sinks.Many<JSONRPCMessage> outboundSink;
 
 	private Consumer<JSONRPCMessage> inboundMessageHandler = message -> logger.debug("Received message: {}", message);
 
-	private Consumer<String> errorHandler = error -> logger.error("Received error: {}", error);
-
 	public AbstractMcpTransport() {
-		this(new ObjectMapper());
-	}
-
-	public AbstractMcpTransport(ObjectMapper objectMapper) {
-
-		Assert.notNull(objectMapper, "ObjectMapper must not be null");
-		this.objectMapper = objectMapper;
-
-		this.errorSink = Sinks.many().unicast().onBackpressureBuffer();
 		this.inboundSink = Sinks.many().unicast().onBackpressureBuffer();
 		this.outboundSink = Sinks.many().unicast().onBackpressureBuffer();
 	}
 
-	public ObjectMapper getObjectMapper() {
-		return this.objectMapper;
-	}
-
 	private void handleIncomingMessages() {
 		this.inboundSink.asFlux().subscribe(message -> this.inboundMessageHandler.accept(message));
-	}
-
-	private void handleIncomingErrors() {
-		this.errorSink.asFlux().subscribe(e -> {
-			this.errorHandler.accept(e);
-		});
 	}
 
 	protected Sinks.Many<JSONRPCMessage> getInboundSink() {
@@ -86,21 +60,12 @@ public abstract class AbstractMcpTransport implements McpTransport {
 		return outboundSink;
 	}
 
-	protected Sinks.Many<String> getErrorSink() {
-		return errorSink;
-	}
-
 	public void setInboundMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler) {
 		this.inboundMessageHandler = inboundMessageHandler;
 	}
 
-	public void setInboundErrorHandler(Consumer<String> errorHandler) {
-		this.errorHandler = errorHandler;
-	}
-
 	// Start processing incoming messages
 	public void start() {
-		this.handleIncomingErrors();
 		this.handleIncomingMessages();
 	}
 
