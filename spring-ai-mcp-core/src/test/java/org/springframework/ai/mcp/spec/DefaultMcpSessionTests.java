@@ -17,9 +17,11 @@
 package org.springframework.ai.mcp.spec;
 
 import java.time.Duration;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,10 +30,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
-import org.springframework.ai.mcp.client.McpAsyncClient;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCNotification;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCRequest;
 
@@ -63,33 +67,49 @@ class DefaultMcpSessionTests {
 	private ObjectMapper objectMapper;
 
 	@SuppressWarnings("unused")
-	private static class MockMcpTransport extends AbstractMcpTransport {
+	private static class MockMcpTransport implements McpTransport {
 
 		private final AtomicInteger inboundMessageCount = new AtomicInteger(0);
 
-		private final AtomicReference<McpSchema.JSONRPCMessage> lastSentMessage = new AtomicReference<>();
+		private Sinks.Many<McpSchema.JSONRPCMessage> outgoing = Sinks.many().multicast().onBackpressureBuffer();
+
+		private Sinks.Many<McpSchema.JSONRPCMessage> inbound = Sinks.many().unicast().onBackpressureBuffer();
+
+		private Flux<McpSchema.JSONRPCMessage> outboundView = outgoing.asFlux().cache(1);
 
 		public void simulateIncomingMessage(McpSchema.JSONRPCMessage message) {
+			if (inbound.tryEmitNext(message).isFailure()) {
+				throw new RuntimeException("Failed to emit message " + message);
+			}
 			inboundMessageCount.incrementAndGet();
-			this.getInboundSink().tryEmitNext(message);
 		}
 
 		@Override
 		public Mono<Void> sendMessage(McpSchema.JSONRPCMessage message) {
-			lastSentMessage.set(message);
+			if (outgoing.tryEmitNext(message).isFailure()) {
+				return Mono.error(new RuntimeException("Can't emit outgoing message " + message));
+			}
 			return Mono.empty();
 		}
 
 		public McpSchema.JSONRPCRequest getLastSentMessageAsRequest() {
-			return (JSONRPCRequest) lastSentMessage.get();
+			return (JSONRPCRequest) outboundView.blockFirst();
 		}
 
 		public McpSchema.JSONRPCNotification getLastSentMessageAsNotifiation() {
-			return (JSONRPCNotification) lastSentMessage.get();
+			return (JSONRPCNotification) outboundView.blockFirst();
 		}
 
 		public McpSchema.JSONRPCMessage getLastSentMessage() {
-			return lastSentMessage.get();
+			return outboundView.blockFirst();
+		}
+
+		@Override
+		public Mono<Void> connect(Function<Mono<McpSchema.JSONRPCMessage>, Mono<McpSchema.JSONRPCMessage>> handler) {
+			return inbound.asFlux()
+				.publishOn(Schedulers.boundedElastic())
+				.flatMap(message -> Mono.just(message).transform(handler))
+				.then();
 		}
 
 		@Override
@@ -138,18 +158,13 @@ class DefaultMcpSessionTests {
 		String responseData = "test response";
 
 		// Create a Mono that will emit the response after the request is sent
-		Mono<String> responseMono = session.sendRequest(TEST_METHOD, testParam, responseType)
-			.doOnSubscribe(subscription -> {
-				// Wait a bit to ensure the request is sent and captured
-				Mono.delay(Duration.ofMillis(100)).subscribe(ignored -> {
-					McpSchema.JSONRPCRequest request = transport.getLastSentMessageAsRequest();
-					transport.simulateIncomingMessage(
-							new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION, request.id(), responseData, null));
-				});
-			});
-
+		Mono<String> responseMono = session.sendRequest(TEST_METHOD, testParam, responseType);
 		// Verify response handling
-		StepVerifier.create(responseMono).consumeNextWith(response -> {
+		StepVerifier.create(responseMono).then(() -> {
+			McpSchema.JSONRPCRequest request = transport.getLastSentMessageAsRequest();
+			transport.simulateIncomingMessage(
+					new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION, request.id(), responseData, null));
+		}).consumeNextWith(response -> {
 			// Verify the request was sent
 			McpSchema.JSONRPCMessage sentMessage = transport.getLastSentMessageAsRequest();
 			assertThat(sentMessage).isInstanceOf(McpSchema.JSONRPCRequest.class);
@@ -162,26 +177,21 @@ class DefaultMcpSessionTests {
 
 	@Test
 	void testSendRequestWithError() {
-		Mono<String> responseMono = session.sendRequest(TEST_METHOD, "test", responseType)
-			.doOnSubscribe(subscription -> {
-				// Wait a bit to ensure the request is sent and captured
-				Mono.delay(Duration.ofMillis(100)).subscribe(ignored -> {
-					McpSchema.JSONRPCRequest request = transport.getLastSentMessageAsRequest();
-					// Simulate error response
-					McpSchema.JSONRPCResponse.JSONRPCError error = new McpSchema.JSONRPCResponse.JSONRPCError(
-							McpSchema.ErrorCodes.METHOD_NOT_FOUND, "Method not found", null);
-					transport.simulateIncomingMessage(
-							new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION, request.id(), null, error));
-				});
-			});
+		Mono<String> responseMono = session.sendRequest(TEST_METHOD, "test", responseType);
 
 		// Verify error handling
-		StepVerifier.create(responseMono).expectError(McpError.class).verify();
+		StepVerifier.create(responseMono).then(() -> {
+			McpSchema.JSONRPCRequest request = transport.getLastSentMessageAsRequest();
+			// Simulate error response
+			McpSchema.JSONRPCResponse.JSONRPCError error = new McpSchema.JSONRPCResponse.JSONRPCError(
+					McpSchema.ErrorCodes.METHOD_NOT_FOUND, "Method not found", null);
+			transport.simulateIncomingMessage(
+					new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION, request.id(), null, error));
+		}).expectError(McpError.class).verify();
 	}
 
 	@Test
 	void testRequestTimeout() {
-
 		Mono<String> responseMono = session.sendRequest(TEST_METHOD, "test", responseType);
 
 		// Verify timeout
@@ -210,6 +220,7 @@ class DefaultMcpSessionTests {
 		String echoMessage = "Hello MCP!";
 		Map<String, DefaultMcpSession.RequestHandler> requestHandlers = Map.of(ECHO_METHOD,
 				params -> Mono.just(params));
+		transport = new MockMcpTransport();
 		session = new DefaultMcpSession(TIMEOUT, objectMapper, transport, requestHandlers, Map.of());
 
 		// Simulate incoming request
@@ -227,10 +238,11 @@ class DefaultMcpSessionTests {
 
 	@Test
 	void testNotificationHandling() {
-		AtomicReference<Object> receivedParams = new AtomicReference<>();
+		Sinks.One<Object> receivedParams = Sinks.one();
 
+		transport = new MockMcpTransport();
 		session = new DefaultMcpSession(TIMEOUT, objectMapper, transport, Map.of(),
-				Map.of(TEST_NOTIFICATION, params -> Mono.fromRunnable(() -> receivedParams.set(params))));
+				Map.of(TEST_NOTIFICATION, params -> Mono.fromRunnable(() -> receivedParams.tryEmitValue(params))));
 
 		// Simulate incoming notification from the server
 		Map<String, Object> notificationParams = Map.of("status", "ready");
@@ -241,7 +253,7 @@ class DefaultMcpSessionTests {
 		transport.simulateIncomingMessage(notification);
 
 		// Verify handler was called
-		assertThat(receivedParams.get()).isEqualTo(notificationParams);
+		assertThat(receivedParams.asMono().block(Duration.ofSeconds(1))).isEqualTo(notificationParams);
 	}
 
 	@Test

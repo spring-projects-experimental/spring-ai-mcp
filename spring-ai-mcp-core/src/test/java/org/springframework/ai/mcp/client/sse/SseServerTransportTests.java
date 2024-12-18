@@ -16,9 +16,11 @@
 
 package org.springframework.ai.mcp.client.sse;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -27,11 +29,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCRequest;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,33 +70,40 @@ class SseServerTransportTests {
 
 		private final AtomicInteger inboundMessageCount = new AtomicInteger(0);
 
+		private Sinks.Many<ServerSentEvent<String>> events = Sinks.many().unicast().onBackpressureBuffer();
+
 		public TestSseServerTransport(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
 			super(webClientBuilder, objectMapper);
 		}
 
-		// simulate receiving a message from the server
-		public void emitTestMessage(McpSchema.JSONRPCMessage message) {
-			getInboundSink().tryEmitNext(message);
-			inboundMessageCount.incrementAndGet();
+		// @Override
+		// public Mono<Void> connect(Function<Mono<McpSchema.JSONRPCMessage>,
+		// Mono<McpSchema.JSONRPCMessage>> handler) {
+		// simulateEndpointEvent("https://localhost:3001");
+		// return super.connect(handler);
+		// }
+
+		@Override
+		protected Flux<ServerSentEvent<String>> eventStream() {
+			return super.eventStream().mergeWith(events.asFlux());
 		}
 
 		public String getLastEndpoint() {
-			return messageEndpointSink.asFlux().blockFirst();
+			return messageEndpointSink.asMono().block();
 		}
 
 		public int getInboundMessageCount() {
 			return inboundMessageCount.get();
 		}
 
+		public void simulateEndpointEvent(String jsonMessage) {
+			events.tryEmitNext(ServerSentEvent.<String>builder().event("endpoint").data(jsonMessage).build());
+			inboundMessageCount.incrementAndGet();
+		}
+
 		public void simulateMessageEvent(String jsonMessage) {
-			try {
-				McpSchema.JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(this.objectMapper, jsonMessage);
-				getInboundSink().tryEmitNext(message);
-				inboundMessageCount.incrementAndGet();
-			}
-			catch (Exception e) {
-				throw new RuntimeException("Failed to simulate message event", e);
-			}
+			events.tryEmitNext(ServerSentEvent.<String>builder().event("message").data(jsonMessage).build());
+			inboundMessageCount.incrementAndGet();
 		}
 
 	}
@@ -108,6 +120,7 @@ class SseServerTransportTests {
 		webClientBuilder = WebClient.builder().baseUrl(host);
 		objectMapper = new ObjectMapper();
 		transport = new TestSseServerTransport(webClientBuilder, objectMapper);
+		transport.connect(Function.identity()).block();
 	}
 
 	@AfterEach

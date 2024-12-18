@@ -16,26 +16,27 @@
 package org.springframework.ai.mcp.client.sse;
 
 import java.io.IOException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.publisher.SynchronousSink;
-import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 import reactor.util.retry.Retry.RetrySignal;
 
 import org.springframework.ai.mcp.client.util.Assert;
-import org.springframework.ai.mcp.spec.AbstractMcpTransport;
+import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCMessage;
+import org.springframework.ai.mcp.spec.McpTransport;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -70,7 +71,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * "https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse">MCP
  * HTTP with SSE Transport Specification</a>
  */
-public class SseServerTransport extends AbstractMcpTransport {
+public class SseServerTransport implements McpTransport {
 
 	private final static Logger logger = LoggerFactory.getLogger(SseServerTransport.class);
 
@@ -112,22 +113,10 @@ public class SseServerTransport extends AbstractMcpTransport {
 	protected ObjectMapper objectMapper;
 
 	/**
-	 * Dedicated scheduler for processing outbound messages. Ensures sequential processing
-	 * of outbound messages on a single thread.
-	 */
-	private Scheduler outboundScheduler;
-
-	/**
 	 * Subscription for the SSE connection handling inbound messages. Used for cleanup
 	 * during transport shutdown.
 	 */
 	private Disposable inboundSubscription;
-
-	/**
-	 * Subscription for the outbound message processing pipeline. Used for cleanup during
-	 * transport shutdown.
-	 */
-	private Disposable outboundSubscription;
 
 	/**
 	 * Flag indicating if the transport is in the process of shutting down. Used to
@@ -139,7 +128,7 @@ public class SseServerTransport extends AbstractMcpTransport {
 	 * Sink for managing the message endpoint URI provided by the server. Stores the most
 	 * recent endpoint URI and makes it available for outbound message processing.
 	 */
-	protected final Sinks.Many<String> messageEndpointSink = Sinks.many().replay().latest();
+	protected final Sinks.One<String> messageEndpointSink = Sinks.one();
 
 	/**
 	 * Constructs a new SseServerTransport with the specified WebClient builder. Uses a
@@ -166,11 +155,73 @@ public class SseServerTransport extends AbstractMcpTransport {
 
 		this.objectMapper = objectMapper;
 		this.webClient = webClientBuilder.build();
+	}
 
-		this.outboundScheduler = Schedulers.fromExecutorService(Executors.newSingleThreadExecutor(), "outbound");
+	@Override
+	public Mono<Void> connect(Function<Mono<JSONRPCMessage>, Mono<JSONRPCMessage>> handler) {
+		Flux<ServerSentEvent<String>> events = eventStream();
+		this.inboundSubscription = events.concatMap(event -> Mono.just(event).<JSONRPCMessage>handle((e, s) -> {
+			if (ENDPOINT_EVENT_TYPE.equals(event.event())) {
+				String messageEndpointUri = event.data();
+				if (messageEndpointSink.tryEmitValue(messageEndpointUri).isSuccess()) {
+					s.complete();
+				}
+				else {
+					// TODO: clarify with the spec if multiple events can be
+					// received
+					s.error(new McpError("Failed to handle SSE endpoint event"));
+				}
+			}
+			else if (MESSAGE_EVENT_TYPE.equals(event.event())) {
+				try {
+					JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(this.objectMapper, event.data());
+					s.next(message);
+				}
+				catch (IOException ioException) {
+					s.error(ioException);
+				}
+			}
+			else {
+				s.error(new McpError("Received unrecognized SSE event type: " + event.event()));
+			}
+		}).transform(handler)).subscribe();
 
-		startInboundProcessing();
-		startOutboundProcessing();
+		// The connection is established once the server sends the endpoint event
+		return messageEndpointSink.asMono().then();
+	}
+
+	@Override
+	public Mono<Void> sendMessage(JSONRPCMessage message) {
+		// The messageEndpoint is the endpoint URI to send the messages
+		// It is provided by the server as part of the endpoint event
+		return messageEndpointSink.asMono().flatMap(messageEndpointUri -> {
+			if (isClosing) {
+				return Mono.empty();
+			}
+			try {
+				String jsonText = this.objectMapper.writeValueAsString(message);
+				return webClient.post()
+					.uri(messageEndpointUri)
+					.contentType(MediaType.APPLICATION_JSON)
+					.bodyValue(jsonText)
+					.retrieve()
+					.toBodilessEntity()
+					.doOnSuccess(response -> {
+						logger.debug("Message sent successfully");
+					})
+					.doOnError(error -> {
+						if (!isClosing) {
+							logger.error("Error sending message: {}", error.getMessage());
+						}
+					});
+			}
+			catch (IOException e) {
+				if (!isClosing) {
+					return Mono.error(new RuntimeException("Failed to serialize message", e));
+				}
+				return Mono.empty();
+			}
+		}).then(); // TODO: Consider non-200-ok response
 	}
 
 	/**
@@ -178,18 +229,15 @@ public class SseServerTransport extends AbstractMcpTransport {
 	 * connection and sets up event handling for both message and endpoint events.
 	 * Includes automatic retry logic for handling transient connection failures.
 	 */
-	private void startInboundProcessing() {// @formatter:off
-		this.inboundSubscription = this.webClient
+	// visible for tests
+	protected Flux<ServerSentEvent<String>> eventStream() {// @formatter:off
+		return this.webClient
 			.get()
 			.uri(SSE_ENDPOINT)
 			.accept(MediaType.TEXT_EVENT_STREAM)
 			.retrieve()
 			.bodyToFlux(SSE_TYPE)
-			.retryWhen(Retry.from(retrySignal -> retrySignal.handle(inboundRetryHandler)))
-			.subscribe(
-				onInboudEvent,
-				onInboundError,
-				onInboundComplete);
+			.retryWhen(Retry.from(retrySignal -> retrySignal.handle(inboundRetryHandler)));
 	} // @formatter:on
 
 	/**
@@ -212,112 +260,6 @@ public class SseServerTransport extends AbstractMcpTransport {
 	};
 
 	/**
-	 * Processes incoming SSE events, handling both message and endpoint events. For
-	 * message events, deserializes and emits JSON-RPC messages to the inbound sink. For
-	 * endpoint events, updates the message endpoint URI for outbound messages.
-	 */
-	private Consumer<ServerSentEvent<String>> onInboudEvent = event -> {
-		if (!isClosing) {
-			try {
-				logger.debug("Received SSE event: {}", event);
-
-				// When a client connects, the server MUST send an endpoint event
-				// containing a URI for the client to use for sending messages.
-				// All subsequent client messages MUST be sent as HTTP POST requests
-				// to this endpoint.
-				if (ENDPOINT_EVENT_TYPE.equals(event.event())) {
-
-					String messageEndpointUri = event.data();
-					messageEndpointSink.tryEmitNext(messageEndpointUri);
-
-				}
-				else if (MESSAGE_EVENT_TYPE.equals(event.event())) {
-					JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(this.objectMapper, event.data());
-
-					if (!this.getInboundSink().tryEmitNext(message).isSuccess()) {
-						throw new RuntimeException("Failed to enqueue message");
-					}
-				}
-			}
-			catch (Exception e) {
-				if (!isClosing) {
-					throw new RuntimeException(e);
-				}
-			}
-		}
-	};
-
-	/**
-	 * Error handler for the inbound SSE stream.
-	 */
-	private Consumer<Throwable> onInboundError = error -> {
-		if (!isClosing) {
-			logger.error("Error receiving SSE: {}", error);
-		}
-	};
-
-	/**
-	 * Completion handler for the inbound SSE stream.
-	 */
-	private Runnable onInboundComplete = () -> {
-		if (!isClosing) {
-			logger.info("SSE stream completed!");
-		}
-	};
-
-	/**
-	 * Initializes and starts the outbound message processing. Sets up the pipeline for
-	 * sending messages to the server-provided endpoint. Messages are sent as HTTP POST
-	 * requests with JSON content.
-	 *
-	 * <p>
-	 *
-	 * This pipeline depends on the inbound pipeline to provide the message endpoint URI
-	 * for the client to use for sending messages. The messageEndpointSink is used to
-	 * store the most recent message endpoint URI provided by the server.
-	 */
-	private void startOutboundProcessing() {// @formatter:off
-		this.outboundSubscription = messageEndpointSink.asFlux()
-			// The messageEndpoint is the endpoint URI to send the messages
-			// It is provided by the server as part of the endpoint event
-			.flatMap(messageEndpointUri -> this.getOutboundSink()
-				.asFlux()
-				.publishOn(outboundScheduler)
-				.flatMap(jsonRpcMessage -> {
-					if (isClosing) {
-						return Mono.empty();
-					}
-					
-					try {
-						String jsonText = this.objectMapper.writeValueAsString(jsonRpcMessage);
-						
-						return webClient.post()
-							.uri(messageEndpointUri)
-							.contentType(MediaType.APPLICATION_JSON)
-							.bodyValue(jsonText)
-							.retrieve()
-							.toBodilessEntity()
-							.doOnSuccess(response -> {
-								logger.debug("Message sent successfully");
-							})
-							.doOnError(error -> {
-								if (!isClosing) {
-									logger.error("Error sending message: {}", error.getMessage());
-								}
-							})
-							.thenReturn(jsonRpcMessage);
-					}
-					catch (IOException e) {
-						if (!isClosing) {
-							return Mono.error(new RuntimeException("Failed to serialize message", e));
-						}
-						return Mono.empty();
-					}
-				}))
-			.subscribe();
-	} // @formatter:on
-
-	/**
 	 * Implements graceful shutdown of the transport. Cleans up all resources including
 	 * subscriptions and schedulers. Ensures orderly shutdown of both inbound and outbound
 	 * message processing.
@@ -333,18 +275,7 @@ public class SseServerTransport extends AbstractMcpTransport {
 			if (inboundSubscription != null) {
 				inboundSubscription.dispose();
 			}
-			
-			if (outboundSubscription != null) {
-				outboundSubscription.dispose();
-			}
-			
-			// Dispose of scheduler
-			if (outboundScheduler != null) {
-				outboundScheduler.dispose();
-			}
 
-			// Complete the endpoint sink
-			// messageEndpointSink.tryEmitComplete();
 		})
 		.then()
 		.subscribeOn(Schedulers.boundedElastic());

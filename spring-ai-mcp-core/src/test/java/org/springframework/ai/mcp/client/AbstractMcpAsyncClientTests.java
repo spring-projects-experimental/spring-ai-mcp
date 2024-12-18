@@ -53,7 +53,7 @@ public abstract class AbstractMcpAsyncClientTests {
 
 	private static final String ECHO_TEST_MESSAGE = "Hello MCP Spring AI!";
 
-	abstract protected void createMcpTransport();
+	abstract protected McpTransport createMcpTransport();
 
 	abstract protected void onStart();
 
@@ -62,7 +62,7 @@ public abstract class AbstractMcpAsyncClientTests {
 	@BeforeEach
 	void setUp() {
 		onStart();
-		createMcpTransport();
+		this.mcpTransport = createMcpTransport();
 
 		assertThatCode(() -> {
 			mcpAsyncClient = McpClient.async(mcpTransport, TIMEOUT, new ObjectMapper());

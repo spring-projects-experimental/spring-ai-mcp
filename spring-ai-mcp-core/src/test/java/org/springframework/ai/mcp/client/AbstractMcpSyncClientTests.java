@@ -53,7 +53,7 @@ public abstract class AbstractMcpSyncClientTests {
 
 	protected McpTransport mcpTransport;
 
-	abstract protected void createMcpTransport();
+	abstract protected McpTransport createMcpTransport();
 
 	abstract protected void onStart();
 
@@ -62,7 +62,7 @@ public abstract class AbstractMcpSyncClientTests {
 	@BeforeEach
 	void setUp() {
 		onStart();
-		createMcpTransport();
+		this.mcpTransport = createMcpTransport();
 
 		assertThatCode(() -> {
 			mcpSyncClient = McpClient.sync(mcpTransport, TIMEOUT, new ObjectMapper());

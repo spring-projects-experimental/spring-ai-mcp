@@ -16,7 +16,7 @@
 
 package org.springframework.ai.mcp.spec;
 
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 import reactor.core.publisher.Mono;
 
@@ -59,7 +59,7 @@ public interface McpTransport {
 	 * necessary resources and establishes the connection to the server.
 	 * </p>
 	 */
-	void start();
+	Mono<Void> connect(Function<Mono<JSONRPCMessage>, Mono<JSONRPCMessage>> handler);
 
 	/**
 	 * Closes the transport connection and releases any associated resources.
@@ -79,19 +79,6 @@ public interface McpTransport {
 	 * @return a {@link Mono<Void>} that completes when the connection has been closed.
 	 */
 	Mono<Void> closeGracefully();
-
-	/**
-	 * Sets the handler for processing incoming messages from the server.
-	 *
-	 * <p>
-	 * The provided handler will be called whenever a new message is received from the
-	 * server. Messages are expected to follow the JSON-RPC format as defined in the MCP
-	 * specification.
-	 * </p>
-	 * @param inboundMessageHandler a consumer that processes incoming
-	 * {@link JSONRPCMessage}s
-	 */
-	void setInboundMessageHandler(Consumer<JSONRPCMessage> inboundMessageHandler);
 
 	/**
 	 * Sends a message to the server asynchronously.

@@ -25,19 +25,21 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import org.springframework.ai.mcp.client.util.Assert;
-import org.springframework.ai.mcp.spec.AbstractMcpTransport;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCMessage;
+import org.springframework.ai.mcp.spec.McpTransport;
 
 /**
  * Implementation of the MCP Stdio transport that communicates with a server process using
@@ -47,9 +49,13 @@ import org.springframework.ai.mcp.spec.McpSchema.JSONRPCMessage;
  * @author Christian Tzolov
  * @author Dariusz Jędrzejczyk
  */
-public class StdioServerTransport extends AbstractMcpTransport {
+public class StdioServerTransport implements McpTransport {
 
 	private static final Logger logger = LoggerFactory.getLogger(StdioServerTransport.class);
+
+	private final Sinks.Many<JSONRPCMessage> inboundSink;
+
+	private final Sinks.Many<JSONRPCMessage> outboundSink;
 
 	/** The server process being communicated with */
 	private Process process;
@@ -70,7 +76,8 @@ public class StdioServerTransport extends AbstractMcpTransport {
 
 	private final Sinks.Many<String> errorSink;
 
-	private Consumer<String> errorHandler = error -> logger.error("Error received: {}", error);
+	// visible for tests
+	Consumer<String> errorHandler = error -> logger.error("Error received: {}", error);
 
 	/**
 	 * Creates a new StdioServerTransport with the specified parameters and default
@@ -89,6 +96,9 @@ public class StdioServerTransport extends AbstractMcpTransport {
 	public StdioServerTransport(ServerParameters params, ObjectMapper objectMapper) {
 		Assert.notNull(params, "The params can not be null");
 		Assert.notNull(objectMapper, "The ObjectMapper can not be null");
+
+		this.inboundSink = Sinks.many().unicast().onBackpressureBuffer();
+		this.outboundSink = Sinks.many().unicast().onBackpressureBuffer();
 
 		this.params = params;
 
@@ -110,41 +120,39 @@ public class StdioServerTransport extends AbstractMcpTransport {
 	 * are null
 	 */
 	@Override
-	public void start() {
-		// Let's kick off the abstraction layer that will consume the logical messages
-		// pushed via sinks. The code that follows is actually feeding the sinks with
-		// data.
-		super.start();
+	public Mono<Void> connect(Function<Mono<JSONRPCMessage>, Mono<JSONRPCMessage>> handler) {
+		return Mono.<Void>fromRunnable(() -> {
+			handleIncomingMessages(handler);
+			handleIncomingErrors();
 
-		handleIncomingErrors();
+			// Prepare command and environment
+			List<String> fullCommand = new ArrayList<>();
+			fullCommand.add(params.getCommand());
+			fullCommand.addAll(params.getArgs());
 
-		// Prepare command and environment
-		List<String> fullCommand = new ArrayList<>();
-		fullCommand.add(params.getCommand());
-		fullCommand.addAll(params.getArgs());
+			ProcessBuilder processBuilder = this.getProcessBuilder();
+			processBuilder.command(fullCommand);
+			processBuilder.environment().putAll(params.getEnv());
 
-		ProcessBuilder processBuilder = this.getProcessBuilder();
-		processBuilder.command(fullCommand);
-		processBuilder.environment().putAll(params.getEnv());
+			// Start the process
+			try {
+				this.process = processBuilder.start();
+			}
+			catch (IOException e) {
+				throw new RuntimeException("Failed to start process with command: " + fullCommand, e);
+			}
 
-		// Start the process
-		try {
-			this.process = processBuilder.start();
-		}
-		catch (IOException e) {
-			throw new RuntimeException("Failed to start process with command: " + fullCommand, e);
-		}
+			// Validate process streams
+			if (this.process.getInputStream() == null || process.getOutputStream() == null) {
+				this.process.destroy();
+				throw new RuntimeException("Process input or output stream is null");
+			}
 
-		// Validate process streams
-		if (this.process.getInputStream() == null || process.getOutputStream() == null) {
-			this.process.destroy();
-			throw new RuntimeException("Process input or output stream is null");
-		}
-
-		// Start threads
-		startInboundProcessing();
-		startOutboundProcessing();
-		startErrorProcessing();
+			// Start threads
+			startInboundProcessing();
+			startOutboundProcessing();
+			startErrorProcessing();
+		}).subscribeOn(Schedulers.boundedElastic());
 	}
 
 	/**
@@ -208,10 +216,33 @@ public class StdioServerTransport extends AbstractMcpTransport {
 		});
 	}
 
+	private void handleIncomingMessages(Function<Mono<JSONRPCMessage>, Mono<JSONRPCMessage>> inboundMessageHandler) {
+		this.inboundSink.asFlux()
+			.flatMap(message -> Mono.just(message)
+				.transform(inboundMessageHandler)
+				.contextWrite(ctx -> ctx.put("observation", "myObservation")))
+			.subscribe();
+	}
+
 	private void handleIncomingErrors() {
 		this.errorSink.asFlux().subscribe(e -> {
 			this.errorHandler.accept(e);
 		});
+	}
+
+	@Override
+	public Mono<Void> sendMessage(JSONRPCMessage message) {
+		if (this.outboundSink.tryEmitNext(message).isSuccess()) {
+			// TODO: essentially we could reschedule ourselves in some time and make
+			// another attempt with the already read data but pause reading until
+			// success
+			// In this approach we delegate the retry and the backpressure onto the
+			// caller. This might be enough for most cases.
+			return Mono.empty();
+		}
+		else {
+			return Mono.error(new RuntimeException("Failed to enqueue message"));
+		}
 	}
 
 	/**
@@ -225,7 +256,7 @@ public class StdioServerTransport extends AbstractMcpTransport {
 				while ((line = processReader.readLine()) != null) {
 					try {
 						JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(this.objectMapper, line);
-						if (!this.getInboundSink().tryEmitNext(message).isSuccess()) {
+						if (!this.inboundSink.tryEmitNext(message).isSuccess()) {
 							// TODO: Back off, reschedule, give up?
 							throw new RuntimeException("Failed to enqueue message");
 						}
@@ -247,8 +278,7 @@ public class StdioServerTransport extends AbstractMcpTransport {
 	 * delimiter.
 	 */
 	private void startOutboundProcessing() {
-		this.getOutboundSink()
-			.asFlux()
+		this.handleOutbound(messages -> messages
 			// this bit is important since writes come from user threads and we
 			// want to ensure that the actual writing happens on a dedicated thread
 			.publishOn(outboundScheduler)
@@ -265,8 +295,11 @@ public class StdioServerTransport extends AbstractMcpTransport {
 						s.error(new RuntimeException(e));
 					}
 				}
-			})
-			.subscribe();
+			}));
+	}
+
+	protected void handleOutbound(Function<Flux<JSONRPCMessage>, Flux<JSONRPCMessage>> outboundConsumer) {
+		outboundConsumer.apply(outboundSink.asFlux()).subscribe();
 	}
 
 	/**

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
 
@@ -57,6 +58,8 @@ public class DefaultMcpSession implements McpSession {
 	private final Duration requestTimeout;
 
 	/** JSON object mapper for serialization/deserialization */
+	// TODO: Consider whether we can do the marshalling/unmarshalling in one place -
+	// currently we do it both here and in McpTransport
 	private final ObjectMapper objectMapper;
 
 	/** Transport layer implementation for message exchange */
@@ -76,6 +79,8 @@ public class DefaultMcpSession implements McpSession {
 
 	/** Atomic counter for generating unique request IDs */
 	private final AtomicLong requestCounter = new AtomicLong(0);
+
+	private final Disposable connection;
 
 	/**
 	 * Functional interface for handling incoming JSON-RPC requests. Implementations
@@ -142,7 +147,10 @@ public class DefaultMcpSession implements McpSession {
 		this.requestHandlers.putAll(requestHandlers);
 		this.notificationHandlers.putAll(notificationHandlers);
 
-		this.transport.setInboundMessageHandler(message -> {
+		// TODO: consider mono.transformDeferredContextual where the Context contains the
+		// Observation associated with the individual message - it can be used to
+		// create child Observation and emit it together with the message to the consumer
+		this.connection = this.transport.connect(mono -> mono.doOnNext(message -> {
 			if (message instanceof McpSchema.JSONRPCResponse response) {
 				var sink = pendingResponses.remove(response.id());
 				if (sink == null) {
@@ -165,9 +173,7 @@ public class DefaultMcpSession implements McpSession {
 				handleIncomingNotification(notification).subscribe(null,
 						error -> logger.error("Error handling notification: {}", error.getMessage()));
 			}
-		});
-
-		this.transport.start();
+		})).subscribe();
 	}
 
 	/**
@@ -275,6 +281,7 @@ public class DefaultMcpSession implements McpSession {
 	 */
 	@Override
 	public Mono<Void> closeGracefully() {
+		this.connection.dispose();
 		return transport.closeGracefully();
 	}
 
@@ -283,6 +290,7 @@ public class DefaultMcpSession implements McpSession {
 	 */
 	@Override
 	public void close() {
+		this.connection.dispose();
 		transport.close();
 	}
 

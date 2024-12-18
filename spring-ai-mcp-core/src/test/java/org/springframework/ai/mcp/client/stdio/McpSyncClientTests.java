@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import org.springframework.ai.mcp.client.AbstractMcpSyncClientTests;
+import org.springframework.ai.mcp.client.McpSyncClient;
+import org.springframework.ai.mcp.spec.McpTransport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,18 +37,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class McpSyncClientTests extends AbstractMcpSyncClientTests {
 
 	@Override
-	protected void createMcpTransport() {
+	protected McpTransport createMcpTransport() {
 		ServerParameters stdioParams = ServerParameters.builder("npx")
 			.args("-y", "@modelcontextprotocol/server-everything", "dir")
 			.build();
-		this.mcpTransport = new StdioServerTransport(stdioParams);
+
+		return new StdioServerTransport(stdioParams);
 	}
 
 	@Test
 	void customErrorHandlerShouldReceiveErrors() {
 		AtomicReference<String> receivedError = new AtomicReference<>();
-		((StdioServerTransport) mcpTransport).setInboundErrorHandler(receivedError::set);
-		mcpTransport.start();
+		((StdioServerTransport) mcpTransport).errorHandler = receivedError::set;
 
 		String errorMessage = "Test error";
 		((StdioServerTransport) mcpTransport).getErrorSink().tryEmitNext(errorMessage);
@@ -56,12 +58,10 @@ class McpSyncClientTests extends AbstractMcpSyncClientTests {
 
 	@Override
 	protected void onStart() {
-
 	}
 
 	@Override
 	protected void onClose() {
-
 	}
 
 }
