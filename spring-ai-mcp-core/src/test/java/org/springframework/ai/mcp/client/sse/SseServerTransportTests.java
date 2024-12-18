@@ -76,13 +76,6 @@ class SseServerTransportTests {
 			super(webClientBuilder, objectMapper);
 		}
 
-		// @Override
-		// public Mono<Void> connect(Function<Mono<McpSchema.JSONRPCMessage>,
-		// Mono<McpSchema.JSONRPCMessage>> handler) {
-		// simulateEndpointEvent("https://localhost:3001");
-		// return super.connect(handler);
-		// }
-
 		@Override
 		protected Flux<ServerSentEvent<String>> eventStream() {
 			return super.eventStream().mergeWith(events.asFlux());

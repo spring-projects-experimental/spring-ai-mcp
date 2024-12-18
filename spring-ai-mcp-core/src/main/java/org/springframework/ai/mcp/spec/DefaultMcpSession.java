@@ -161,6 +161,7 @@ public class DefaultMcpSession implements McpSession {
 				}
 			}
 			else if (message instanceof McpSchema.JSONRPCRequest request) {
+				// TODO: store the Disposable and dispose on shutdown
 				handleIncomingRequest(request).subscribe(response -> transport.sendMessage(response).subscribe(),
 						error -> {
 							var errorResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION, request.id(),
@@ -170,6 +171,7 @@ public class DefaultMcpSession implements McpSession {
 						});
 			}
 			else if (message instanceof McpSchema.JSONRPCNotification notification) {
+				// TODO: store the Disposable and dispose on shutdown
 				handleIncomingNotification(notification).subscribe(null,
 						error -> logger.error("Error handling notification: {}", error.getMessage()));
 			}

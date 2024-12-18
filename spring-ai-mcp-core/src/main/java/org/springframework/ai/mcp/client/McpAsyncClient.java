@@ -36,6 +36,7 @@ import org.springframework.ai.mcp.spec.McpTransport;
  * @author Dariusz Jędrzejczyk
  * @author Christian Tzolov
  */
+// TODO: decouple McpSession from the client - it should be a field and not a parent
 public class McpAsyncClient extends DefaultMcpSession {
 
 	private final static Logger logger = LoggerFactory.getLogger(McpAsyncClient.class);
