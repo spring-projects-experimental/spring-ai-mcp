@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -225,6 +226,9 @@ public class StdioServerTransport extends AbstractMcpTransport {
 				if (message != null) {
 					try {
 						String jsonMessage = objectMapper.writeValueAsString(message);
+						// Escape any embedded newlines in the JSON message as per MCP
+						// spec
+						jsonMessage = jsonMessage.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n");
 						this.process.getOutputStream().write(jsonMessage.getBytes(StandardCharsets.UTF_8));
 						this.process.getOutputStream().write("\n".getBytes(StandardCharsets.UTF_8));
 						this.process.getOutputStream().flush();

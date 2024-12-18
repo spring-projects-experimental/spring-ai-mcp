@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import org.springframework.ai.mcp.client.McpAsyncClient;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCNotification;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCRequest;
 
