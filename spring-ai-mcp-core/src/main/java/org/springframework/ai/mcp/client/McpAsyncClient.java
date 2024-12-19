@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -29,6 +30,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import org.springframework.ai.mcp.spec.DefaultMcpSession;
+import org.springframework.ai.mcp.spec.DefaultMcpSession.NotificationHandler;
 import org.springframework.ai.mcp.spec.DefaultMcpSession.RequestHandler;
 import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
@@ -78,7 +80,8 @@ public class McpAsyncClient {
 	 * notification.
 	 */
 	public McpAsyncClient(McpTransport transport, Duration requestTimeout,
-			List<Supplier<List<Root>>> rootsListProviders, boolean rootsListChangedNotification) {
+			List<Supplier<List<Root>>> rootsListProviders, boolean rootsListChangedNotification,
+			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers) {
 
 		Map<String, RequestHandler> requestHanlers = new HashMap<>();
 
@@ -87,7 +90,14 @@ public class McpAsyncClient {
 			this.rootCapabilities = new McpSchema.ClientCapabilities.RootCapabilities(rootsListChangedNotification);
 		}
 
-		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHanlers, Map.of());
+		Map<String, NotificationHandler> notificationHandlers = new HashMap<>();
+
+		if (toolsChangeConsumers != null && !toolsChangeConsumers.isEmpty()) {
+			notificationHandlers.put("notifications/tools/list_changed",
+					toolsChangeNotificationHandler(toolsChangeConsumers));
+		}
+
+		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHanlers, notificationHandlers);
 
 	}
 
@@ -112,6 +122,25 @@ public class McpAsyncClient {
 					}
 					return combinedList;
 				});
+			}
+		};
+	};
+
+	private NotificationHandler toolsChangeNotificationHandler(
+			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers) {
+
+		return new NotificationHandler() {
+			@Override
+			public Mono<Void> handle(Object params) {
+				// TODO: add support for cursor/pagination
+				return listTools().flatMap(listToolsResult -> Mono.fromRunnable(() -> {
+					for (Consumer<List<McpSchema.Tool>> toolsChangeConsumer : toolsChangeConsumers) {
+						toolsChangeConsumer.accept(listToolsResult.tools());
+					}
+				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+					logger.error("Error handling tools list change notification", error);
+					return Mono.empty();
+				}).then(); // Convert to Mono<Void>
 			}
 		};
 	};

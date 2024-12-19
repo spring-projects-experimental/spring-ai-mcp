@@ -19,8 +19,10 @@ package org.springframework.ai.mcp.client;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.Root;
 import org.springframework.ai.mcp.spec.McpTransport;
 import org.springframework.ai.mcp.util.Assert;
@@ -84,6 +86,8 @@ public class McpClient {
 
 		private List<Supplier<List<Root>>> rootsListProviders = new ArrayList<>();
 
+		private List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = new ArrayList<>();
+
 		private Builder(McpTransport transport) {
 			Assert.notNull(transport, "Transport must not be null");
 			this.transport = transport;
@@ -110,6 +114,11 @@ public class McpClient {
 			return this;
 		}
 
+		public Builder toolsChangeConsumer(Consumer<List<McpSchema.Tool>> toolsChangeConsumer) {
+			this.toolsChangeConsumers.add(toolsChangeConsumer);
+			return this;
+		}
+
 		/**
 		 * Build a synchronous MCP client.
 		 * @return A new instance of {@link McpSyncClient}
@@ -123,7 +132,8 @@ public class McpClient {
 		 * @return A new instance of {@link McpAsyncClient}
 		 */
 		public McpAsyncClient async() {
-			return new McpAsyncClient(transport, requestTimeout, rootsListProviders, rootsListChangedNotification);
+			return new McpAsyncClient(transport, requestTimeout, rootsListProviders, rootsListChangedNotification,
+					toolsChangeConsumers);
 		}
 
 	}

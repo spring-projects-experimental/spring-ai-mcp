@@ -12,7 +12,8 @@ This SDK implements the Model Context Protocol, enabling seamless integration wi
 - Standard MCP operations support:
   - Protocol version compatibility negotiation
   - Client-server capability exchange
-  - Tool discovery and execution
+  - Tool discovery and execution with change notifications
+  - Tool list change notifications with non-blocking consumer support
   - Resource management with URI templates
   - Resource subscription system
   - Roots list management and notifications
@@ -185,6 +186,23 @@ var subscription = client.listResources()
         return client.subscribeResource(new McpSchema.SubscribeRequest("resource-uri"));
     });
 
+// Set up tools change notification handling
+List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = List.of(
+    tools -> {
+        // Handle tools list changes reactively
+        tools.forEach(tool -> {
+            System.out.println("Tool updated: " + tool.name());
+        });
+    }
+);
+
+McpAsyncClient clientWithToolsNotifications = McpClient.using(transport)
+    .toolsChangeConsumer(toolsChangeConsumers)
+    .async();
+
+// The client will now automatically handle tools/list_changed notifications
+// and invoke the consumers on the boundedElastic scheduler to avoid blocking
+
 // Handle results reactively or block if needed
 McpSchema.GetPromptResult promptResult = result.block();
 subscription.block();
@@ -242,6 +260,47 @@ The SDK follows a layered architecture with clear separation of concerns:
    - Parameter validation and processing
    - Execution handling with timeout support
    - Result processing with error handling
+
+### Tool Change Notifications
+
+The SDK supports automatic handling of tool list changes through a non-blocking notification system:
+
+#### Features
+- Register multiple consumers to handle tool list changes
+- Non-blocking execution using Project Reactor's boundedElastic scheduler
+- Automatic tools/list request handling when notifications are received
+- Error resilient with proper error handling and logging
+
+#### Example with Tools Change Notification
+
+```java
+// Create tool change consumers
+List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = List.of(
+    tools -> {
+        // First consumer - e.g., update UI
+        tools.forEach(tool -> updateToolsUI(tool));
+    },
+    tools -> {
+        // Second consumer - e.g., update cache
+        toolsCache.updateTools(tools);
+    }
+);
+
+// Create client with tools change notification support
+McpAsyncClient client = McpClient.using(transport)
+    .toolsChangeConsumer(toolsChangeConsumers)
+    .async();
+
+// Initialize client
+client.initialize()
+    .doOnSuccess(result -> {
+        // Client will automatically handle tools/list_changed notifications
+        // and invoke consumers non-blockingly on boundedElastic scheduler
+    })
+    .subscribe();
+```
+
+The tools change notification system ensures that consumers are executed non-blockingly, preventing any potential performance impact from blocking implementations. All consumers are executed on Project Reactor's boundedElastic scheduler, making it safe to perform potentially blocking operations within the consumers.
 
 ## Error Handling
 

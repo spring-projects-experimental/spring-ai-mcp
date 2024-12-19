@@ -16,15 +16,19 @@
 
 package org.springframework.ai.mcp.client;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+
+import static org.awaitility.Awaitility.await;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -40,10 +44,6 @@ import org.springframework.ai.mcp.spec.McpTransport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class McpAsyncClientResponseHandlerTests {
-
-	private McpAsyncClient asyncMcpClient;
-
-	private MockMcpTransport transport;
 
 	@SuppressWarnings("unused")
 	private static class MockMcpTransport implements McpTransport {
@@ -103,24 +103,56 @@ class McpAsyncClientResponseHandlerTests {
 
 	}
 
-	@BeforeEach
-	void setUp() {
-		transport = new MockMcpTransport();
+	@Test
+	void testToolsChangeNotificationHandling() {
+		MockMcpTransport transport = new MockMcpTransport();
 
-		Supplier<List<Root>> rootsListProvider = () -> List.of(new Root("file:///test/path", "test-root"));
+		// Create a list to store received tools for verification
+		List<McpSchema.Tool> receivedTools = new ArrayList<>();
 
-		asyncMcpClient = McpClient.using(transport).rootsListProvider(rootsListProvider).async();
-	}
+		// Create a consumer that will be called when tools change
+		Consumer<List<McpSchema.Tool>> toolsChangeConsumer = tools -> {
+			receivedTools.addAll(tools);
+		};
 
-	@AfterEach
-	void tearDown() {
-		if (asyncMcpClient != null) {
-			asyncMcpClient.closeGracefully();
-		}
+		// Create client with tools change consumer
+		McpAsyncClient asyncMcpClient = McpClient.using(transport).toolsChangeConsumer(toolsChangeConsumer).async();
+
+		// Create a mock tools list that the server will return
+		Map<String, Object> inputSchema = Map.of("type", "object", "properties", Map.of(), "required", List.of());
+		McpSchema.Tool mockTool = new McpSchema.Tool("test-tool", "Test Tool Description", inputSchema);
+		McpSchema.ListToolsResult mockToolsResult = new McpSchema.ListToolsResult(List.of(mockTool), null);
+
+		// Simulate server sending tools/list_changed notification
+		McpSchema.JSONRPCNotification notification = new McpSchema.JSONRPCNotification(McpSchema.JSONRPC_VERSION,
+				"notifications/tools/list_changed", null);
+		transport.simulateIncomingMessage(notification);
+
+		// Simulate server response to tools/list request
+		McpSchema.JSONRPCRequest toolsListRequest = transport.getLastSentMessageAsRequest();
+		assertThat(toolsListRequest.method()).isEqualTo("tools/list");
+
+		McpSchema.JSONRPCResponse toolsListResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION,
+				toolsListRequest.id(), mockToolsResult, null);
+		transport.simulateIncomingMessage(toolsListResponse);
+
+		// Verify the consumer received the expected tools
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			assertThat(receivedTools).hasSize(1);
+			assertThat(receivedTools.get(0).name()).isEqualTo("test-tool");
+			assertThat(receivedTools.get(0).description()).isEqualTo("Test Tool Description");
+		});
+
+		asyncMcpClient.closeGracefully();
 	}
 
 	@Test
 	void testRootsListRequestHandling() {
+		MockMcpTransport transport = new MockMcpTransport();
+
+		Supplier<List<Root>> rootsListProvider = () -> List.of(new Root("file:///test/path", "test-root"));
+
+		McpAsyncClient asyncMcpClient = McpClient.using(transport).rootsListProvider(rootsListProvider).async();
 
 		// Simulate incoming request
 		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION, "roots/list",
@@ -135,6 +167,8 @@ class McpAsyncClientResponseHandlerTests {
 		assertThat(response.id()).isEqualTo("test-id");
 		assertThat(response.result()).isEqualTo(List.of(new Root("file:///test/path", "test-root")));
 		assertThat(response.error()).isNull();
+
+		asyncMcpClient.closeGracefully();
 	}
 
 }
