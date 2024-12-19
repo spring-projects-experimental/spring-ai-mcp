@@ -88,6 +88,10 @@ public class McpClient {
 
 		private List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = new ArrayList<>();
 
+		private List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers = new ArrayList<>();
+
+		private List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers = new ArrayList<>();
+
 		private Builder(McpTransport transport) {
 			Assert.notNull(transport, "Transport must not be null");
 			this.transport = transport;
@@ -119,6 +123,16 @@ public class McpClient {
 			return this;
 		}
 
+		public Builder resourcesChangeConsumer(Consumer<List<McpSchema.Resource>> resourcesChangeConsumer) {
+			this.resourcesChangeConsumers.add(resourcesChangeConsumer);
+			return this;
+		}
+
+		public Builder promptsChangeConsumer(Consumer<List<McpSchema.Prompt>> promptsChangeConsumer) {
+			this.promptsChangeConsumers.add(promptsChangeConsumer);
+			return this;
+		}
+
 		/**
 		 * Build a synchronous MCP client.
 		 * @return A new instance of {@link McpSyncClient}
@@ -133,7 +147,7 @@ public class McpClient {
 		 */
 		public McpAsyncClient async() {
 			return new McpAsyncClient(transport, requestTimeout, rootsListProviders, rootsListChangedNotification,
-					toolsChangeConsumers);
+					toolsChangeConsumers, resourcesChangeConsumers, promptsChangeConsumers);
 		}
 
 	}

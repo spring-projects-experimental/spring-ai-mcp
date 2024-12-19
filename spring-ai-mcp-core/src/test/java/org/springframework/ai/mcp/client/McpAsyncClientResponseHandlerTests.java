@@ -171,4 +171,96 @@ class McpAsyncClientResponseHandlerTests {
 		asyncMcpClient.closeGracefully();
 	}
 
+	@Test
+	void testResourcesChangeNotificationHandling() {
+		MockMcpTransport transport = new MockMcpTransport();
+
+		// Create a list to store received resources for verification
+		List<McpSchema.Resource> receivedResources = new ArrayList<>();
+
+		// Create a consumer that will be called when resources change
+		Consumer<List<McpSchema.Resource>> resourcesChangeConsumer = resources -> {
+			receivedResources.addAll(resources);
+		};
+
+		// Create client with resources change consumer
+		McpAsyncClient asyncMcpClient = McpClient.using(transport)
+			.resourcesChangeConsumer(resourcesChangeConsumer)
+			.async();
+
+		// Create a mock resources list that the server will return
+		McpSchema.Resource mockResource = new McpSchema.Resource("test://resource", "Test Resource", "A test resource",
+				"text/plain", null);
+		McpSchema.ListResourcesResult mockResourcesResult = new McpSchema.ListResourcesResult(List.of(mockResource),
+				null);
+
+		// Simulate server sending resources/list_changed notification
+		McpSchema.JSONRPCNotification notification = new McpSchema.JSONRPCNotification(McpSchema.JSONRPC_VERSION,
+				"notifications/resources/list_changed", null);
+		transport.simulateIncomingMessage(notification);
+
+		// Simulate server response to resources/list request
+		McpSchema.JSONRPCRequest resourcesListRequest = transport.getLastSentMessageAsRequest();
+		assertThat(resourcesListRequest.method()).isEqualTo("resources/list");
+
+		McpSchema.JSONRPCResponse resourcesListResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION,
+				resourcesListRequest.id(), mockResourcesResult, null);
+		transport.simulateIncomingMessage(resourcesListResponse);
+
+		// Verify the consumer received the expected resources
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			assertThat(receivedResources).hasSize(1);
+			assertThat(receivedResources.get(0).uri()).isEqualTo("test://resource");
+			assertThat(receivedResources.get(0).name()).isEqualTo("Test Resource");
+			assertThat(receivedResources.get(0).description()).isEqualTo("A test resource");
+		});
+
+		asyncMcpClient.closeGracefully();
+	}
+
+	@Test
+	void testPromptsChangeNotificationHandling() {
+		MockMcpTransport transport = new MockMcpTransport();
+
+		// Create a list to store received prompts for verification
+		List<McpSchema.Prompt> receivedPrompts = new ArrayList<>();
+
+		// Create a consumer that will be called when prompts change
+		Consumer<List<McpSchema.Prompt>> promptsChangeConsumer = prompts -> {
+			receivedPrompts.addAll(prompts);
+		};
+
+		// Create client with prompts change consumer
+		McpAsyncClient asyncMcpClient = McpClient.using(transport).promptsChangeConsumer(promptsChangeConsumer).async();
+
+		// Create a mock prompts list that the server will return
+		McpSchema.Prompt mockPrompt = new McpSchema.Prompt("test-prompt", "Test Prompt Description",
+				List.of(new McpSchema.PromptArgument("arg1", "Test argument", true)));
+		McpSchema.ListPromptsResult mockPromptsResult = new McpSchema.ListPromptsResult(List.of(mockPrompt), null);
+
+		// Simulate server sending prompts/list_changed notification
+		McpSchema.JSONRPCNotification notification = new McpSchema.JSONRPCNotification(McpSchema.JSONRPC_VERSION,
+				"notifications/prompts/list_changed", null);
+		transport.simulateIncomingMessage(notification);
+
+		// Simulate server response to prompts/list request
+		McpSchema.JSONRPCRequest promptsListRequest = transport.getLastSentMessageAsRequest();
+		assertThat(promptsListRequest.method()).isEqualTo("prompts/list");
+
+		McpSchema.JSONRPCResponse promptsListResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION,
+				promptsListRequest.id(), mockPromptsResult, null);
+		transport.simulateIncomingMessage(promptsListResponse);
+
+		// Verify the consumer received the expected prompts
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			assertThat(receivedPrompts).hasSize(1);
+			assertThat(receivedPrompts.get(0).name()).isEqualTo("test-prompt");
+			assertThat(receivedPrompts.get(0).description()).isEqualTo("Test Prompt Description");
+			assertThat(receivedPrompts.get(0).arguments()).hasSize(1);
+			assertThat(receivedPrompts.get(0).arguments().get(0).name()).isEqualTo("arg1");
+		});
+
+		asyncMcpClient.closeGracefully();
+	}
+
 }

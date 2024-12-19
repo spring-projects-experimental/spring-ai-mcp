@@ -81,7 +81,9 @@ public class McpAsyncClient {
 	 */
 	public McpAsyncClient(McpTransport transport, Duration requestTimeout,
 			List<Supplier<List<Root>>> rootsListProviders, boolean rootsListChangedNotification,
-			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers) {
+			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers,
+			List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers,
+			List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers) {
 
 		Map<String, RequestHandler> requestHanlers = new HashMap<>();
 
@@ -95,6 +97,16 @@ public class McpAsyncClient {
 		if (toolsChangeConsumers != null && !toolsChangeConsumers.isEmpty()) {
 			notificationHandlers.put("notifications/tools/list_changed",
 					toolsChangeNotificationHandler(toolsChangeConsumers));
+		}
+
+		if (resourcesChangeConsumers != null && !resourcesChangeConsumers.isEmpty()) {
+			notificationHandlers.put("notifications/resources/list_changed",
+					resourcesChangeNotificationHandler(resourcesChangeConsumers));
+		}
+
+		if (promptsChangeConsumers != null && !promptsChangeConsumers.isEmpty()) {
+			notificationHandlers.put("notifications/prompts/list_changed",
+					promptsChangeNotificationHandler(promptsChangeConsumers));
 		}
 
 		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHanlers, notificationHandlers);
@@ -139,6 +151,44 @@ public class McpAsyncClient {
 					}
 				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
 					logger.error("Error handling tools list change notification", error);
+					return Mono.empty();
+				}).then(); // Convert to Mono<Void>
+			}
+		};
+	};
+
+	private NotificationHandler resourcesChangeNotificationHandler(
+			List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers) {
+
+		return new NotificationHandler() {
+			@Override
+			public Mono<Void> handle(Object params) {
+				// TODO: add support for cursor/pagination
+				return listResources().flatMap(listResourcesResult -> Mono.fromRunnable(() -> {
+					for (Consumer<List<McpSchema.Resource>> resourceChangeConsumer : resourcesChangeConsumers) {
+						resourceChangeConsumer.accept(listResourcesResult.resources());
+					}
+				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+					logger.error("Error handling resources list change notification", error);
+					return Mono.empty();
+				}).then(); // Convert to Mono<Void>
+			}
+		};
+	};
+
+	private NotificationHandler promptsChangeNotificationHandler(
+			List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers) {
+
+		return new NotificationHandler() {
+			@Override
+			public Mono<Void> handle(Object params) {
+				// TODO: add support for cursor/pagination
+				return listPrompts().flatMap(listPromptsResult -> Mono.fromRunnable(() -> {
+					for (Consumer<List<McpSchema.Prompt>> promptChangeConsumer : promptsChangeConsumers) {
+						promptChangeConsumer.accept(listPromptsResult.prompts());
+					}
+				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+					logger.error("Error handling prompts list change notification", error);
 					return Mono.empty();
 				}).then(); // Convert to Mono<Void>
 			}

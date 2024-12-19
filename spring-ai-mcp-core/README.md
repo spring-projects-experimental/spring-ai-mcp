@@ -261,17 +261,17 @@ The SDK follows a layered architecture with clear separation of concerns:
    - Execution handling with timeout support
    - Result processing with error handling
 
-### Tool Change Notifications
+### Change Notifications
 
-The SDK supports automatic handling of tool list changes through a non-blocking notification system:
+The SDK supports automatic handling of changes through a non-blocking notification system for tools, resources, and prompts:
 
 #### Features
-- Register multiple consumers to handle tool list changes
+- Register multiple consumers for tools, resources, and prompts changes
 - Non-blocking execution using Project Reactor's boundedElastic scheduler
-- Automatic tools/list request handling when notifications are received
+- Automatic list request handling when notifications are received
 - Error resilient with proper error handling and logging
 
-#### Example with Tools Change Notification
+#### Example with Change Notifications
 
 ```java
 // Create tool change consumers
@@ -286,21 +286,50 @@ List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = List.of(
     }
 );
 
-// Create client with tools change notification support
+// Create resource change consumers
+List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers = List.of(
+    resources -> {
+        // Handle resource changes
+        resources.forEach(resource -> {
+            System.out.println("Resource updated: " + resource.uri());
+            updateResourcesUI(resource);
+        });
+    }
+);
+
+// Create prompt change consumers
+List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers = List.of(
+    prompts -> {
+        // Handle prompt changes
+        prompts.forEach(prompt -> {
+            System.out.println("Prompt updated: " + prompt.name());
+            updatePromptsCache(prompt);
+        });
+    }
+);
+
+// Create client with change notification support
 McpAsyncClient client = McpClient.using(transport)
-    .toolsChangeConsumer(toolsChangeConsumers)
+    .toolsChangeConsumer(toolsChangeConsumer)
+    .resourcesChangeConsumer(resourcesChangeConsumer)
+    .promptsChangeConsumer(promptsChangeConsumer)
     .async();
 
 // Initialize client
 client.initialize()
     .doOnSuccess(result -> {
-        // Client will automatically handle tools/list_changed notifications
+        // Client will automatically handle all change notifications
         // and invoke consumers non-blockingly on boundedElastic scheduler
     })
     .subscribe();
 ```
 
-The tools change notification system ensures that consumers are executed non-blockingly, preventing any potential performance impact from blocking implementations. All consumers are executed on Project Reactor's boundedElastic scheduler, making it safe to perform potentially blocking operations within the consumers.
+The change notification system ensures that all consumers are executed non-blockingly, preventing any potential performance impact from blocking implementations. All consumers are executed on Project Reactor's boundedElastic scheduler, making it safe to perform potentially blocking operations within the consumers.
+
+Each type of notification handler operates independently:
+- Tools: Handles notifications when available tools change
+- Resources: Handles notifications when available resources change
+- Prompts: Handles notifications when available prompts change
 
 ## Error Handling
 

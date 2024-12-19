@@ -183,7 +183,7 @@ public abstract class AbstractMcpAsyncClientTests {
 		var transport = createMcpTransport();
 		List<Supplier<List<Root>>> providers = List.of(() -> List.of(new Root("file:///test/path", "test-root")));
 
-		var client = new McpAsyncClient(transport, TIMEOUT, providers, true, List.of());
+		var client = McpClient.using(transport).requestTimeout(TIMEOUT).rootsListProvider(providers.get(0)).async();
 
 		assertThatCode(() -> client.initialize().block(Duration.ofSeconds(10))).doesNotThrowAnyException();
 
