@@ -17,7 +17,11 @@
 package org.springframework.ai.mcp.client;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
 
+import org.springframework.ai.mcp.spec.McpSchema.Root;
 import org.springframework.ai.mcp.spec.McpTransport;
 import org.springframework.ai.mcp.util.Assert;
 
@@ -38,10 +42,12 @@ import org.springframework.ai.mcp.util.Assert;
  * including request timeout and JSON object mapping.
  *
  * <p>
- * Use the builder pattern for flexible client configuration: <pre>{@code
+ * Use the builder pattern for flexible client configuration:
+ *
+ * <pre>{@code
  * McpClient.using(transport)
- *     .withRequestTimeout(Duration.ofSeconds(5))
- *     .sync(); // or .async()
+ * 		.withRequestTimeout(Duration.ofSeconds(5))
+ * 		.sync(); // or .async()
  * }</pre>
  *
  * @author Christian Tzolov
@@ -74,6 +80,10 @@ public class McpClient {
 
 		private Duration requestTimeout = Duration.ofSeconds(20); // Default timeout
 
+		private boolean rootsListChangedNotification = false;
+
+		private List<Supplier<List<Root>>> rootsListProviders = new ArrayList<>();
+
 		private Builder(McpTransport transport) {
 			Assert.notNull(transport, "Transport must not be null");
 			this.transport = transport;
@@ -84,9 +94,19 @@ public class McpClient {
 		 * @param requestTimeout The duration to wait before timing out requests
 		 * @return This builder instance
 		 */
-		public Builder withRequestTimeout(Duration requestTimeout) {
+		public Builder requestTimeout(Duration requestTimeout) {
 			Assert.notNull(requestTimeout, "Request timeout must not be null");
 			this.requestTimeout = requestTimeout;
+			return this;
+		}
+
+		public Builder rootsListChangedNotification(boolean rootsListChangedNotification) {
+			this.rootsListChangedNotification = rootsListChangedNotification;
+			return this;
+		}
+
+		public Builder rootsListProvider(Supplier<List<Root>> rootsListProvider) {
+			this.rootsListProviders.add(rootsListProvider);
 			return this;
 		}
 
@@ -103,7 +123,7 @@ public class McpClient {
 		 * @return A new instance of {@link McpAsyncClient}
 		 */
 		public McpAsyncClient async() {
-			return new McpAsyncClient(transport, requestTimeout);
+			return new McpAsyncClient(transport, requestTimeout, rootsListProviders, rootsListChangedNotification);
 		}
 
 	}
@@ -121,7 +141,7 @@ public class McpClient {
 	 */
 	@Deprecated
 	public static McpAsyncClient async(McpTransport transport, Duration requestTimeout) {
-		return using(transport).withRequestTimeout(requestTimeout).async();
+		return using(transport).requestTimeout(requestTimeout).async();
 	}
 
 	/**
@@ -137,7 +157,7 @@ public class McpClient {
 	 */
 	@Deprecated
 	public static McpSyncClient sync(McpTransport transport, Duration requestTimeout) {
-		return using(transport).withRequestTimeout(requestTimeout).sync();
+		return using(transport).requestTimeout(requestTimeout).sync();
 	}
 
 }

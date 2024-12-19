@@ -15,6 +15,7 @@ This SDK implements the Model Context Protocol, enabling seamless integration wi
   - Tool discovery and execution
   - Resource management with URI templates
   - Resource subscription system
+  - Roots list management and notifications
   - Prompt handling and management
   - Server initialization and ping
 - Multiple transport implementations:
@@ -71,6 +72,43 @@ The SSE transport provides:
 - Outbound message delivery via HTTP POST
 - Graceful shutdown handling
 - Configurable JSON serialization
+
+### Roots List Support
+
+The SDK supports the MCP roots list capability, which allows servers to understand which directories and files they have access to. Clients can provide a list of root directories/files and notify servers when this list changes.
+
+#### Features
+- Define root providers that supply filesystem access boundaries
+- Support for roots list changed notifications
+- Automatic roots list request handling
+
+#### Example with Roots List Configuration
+
+```java
+// Create root providers
+List<Supplier<List<Root>>> rootProviders = List.of(
+    () -> List.of(new Root("file:///workspace/project", "Project Root")),
+    () -> List.of(new Root("file:///workspace/docs", "Documentation"))
+);
+
+// Create async client with roots list support
+McpAsyncClient client = new McpAsyncClient(
+    new StdioClientTransport(params),
+    Duration.ofSeconds(30),
+    rootProviders,  // Configure root providers
+    true           // Enable roots list changed notifications
+);
+
+// Initialize connection
+client.initialize()
+    .doOnSuccess(result -> {
+        // Connection initialized with roots list capability
+        
+        // Notify server when roots list changes
+        return client.sendRootsListChanged();
+    })
+    .subscribe();
+```
 
 ### Sync Client Example
 
@@ -171,7 +209,7 @@ The SDK follows a layered architecture with clear separation of concerns:
 - **StdioClientTransport**: Standard I/O based client to server communication
 - **SseClientTransport**: HTTP-based transport using Server-Sent Events for bidirectional client-sever communication
 
-<img src="docs/spring-ai-mcp-uml-classdiagram.svg" width="600"/>
+<img src="../docs/spring-ai-mcp-uml-classdiagram.svg" width="600"/>
 
 ### Key Interactions
 

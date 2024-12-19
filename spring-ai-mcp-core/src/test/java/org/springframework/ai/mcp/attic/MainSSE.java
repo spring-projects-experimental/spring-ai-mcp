@@ -40,7 +40,7 @@ public class MainSSE {
 
 		try (McpSyncClient mcpClient = McpClient
 			.using(new SseClientTransport(WebClient.builder().baseUrl("http://localhost:3001")))
-			.withRequestTimeout(Duration.ofSeconds(1000))
+			.requestTimeout(Duration.ofSeconds(1000))
 			.sync()) {
 
 			mcpClient.initialize();

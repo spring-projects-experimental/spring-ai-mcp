@@ -155,15 +155,52 @@ public class McpSchema {
 		@JsonProperty("instructions") String instructions) {
 	} // @formatter:on
 
+	/**
+	 * Clients can implement additional features to enrich connected MCP servers with
+	 * additional capabilities. These capabilities can be used to extend the functionality
+	 * of the server, or to provide additional information to the server about the
+	 * client's capabilities.
+	 *
+	 * @param experimental WIP
+	 * @param roots define the boundaries of where servers can operate within the
+	 * filesystem, allowing them to understand which directories and files they have
+	 * access to.
+	 * @param sampling Provides a standardized way for servers to request LLM sampling
+	 * (“completions” or “generations”) from language models via clients.
+	 *
+	 */
 	@JsonInclude(JsonInclude.Include.NON_ABSENT)
 	public record ClientCapabilities( // @formatter:off
 		@JsonProperty("experimental") Map<String, Object> experimental,
 		@JsonProperty("roots") RootCapabilities roots,
-		@JsonProperty("sampling") Object sampling) {
+		@JsonProperty("sampling") Sampling sampling) {
 
+		/**
+		 * Roots define the boundaries of where servers can operate within the filesystem,
+		 * allowing them to understand which directories and files they have access to.
+		 * Servers can request the list of roots from supporting clients and
+		 * receive notifications when that list changes.
+		 *
+		 * @param listChanged Whether the client would send notification about roots
+		 * 		  has changed since the last time the server checked.
+		 */
 		@JsonInclude(JsonInclude.Include.NON_ABSENT)			
 		public record RootCapabilities(
 			@JsonProperty("listChanged") Boolean listChanged) {
+		}
+
+		/**
+		 * Provides a standardized way for servers to request LLM
+	 	 * sampling (“completions” or “generations”) from language
+		 * models via clients. This flow allows clients to maintain
+		 * control over model access, selection, and permissions
+		 * while enabling servers to leverage AI capabilities—with
+		 * no server API keys necessary. Servers can request text or
+		 * image-based interactions and optionally include context
+		 * from MCP servers in their prompts.
+		 */
+		@JsonInclude(JsonInclude.Include.NON_ABSENT)			
+		public record Sampling() {
 		}
 	}// @formatter:on
 

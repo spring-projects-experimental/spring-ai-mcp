@@ -64,7 +64,7 @@ public abstract class AbstractMcpSyncClientTests {
 		this.mcpTransport = createMcpTransport();
 
 		assertThatCode(() -> {
-			mcpSyncClient = McpClient.using(mcpTransport).withRequestTimeout(TIMEOUT).sync();
+			mcpSyncClient = McpClient.using(mcpTransport).requestTimeout(TIMEOUT).sync();
 			mcpSyncClient.initialize();
 		}).doesNotThrowAnyException();
 	}
@@ -82,7 +82,7 @@ public abstract class AbstractMcpSyncClientTests {
 		assertThatThrownBy(() -> McpClient.using(null).sync()).isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Transport must not be null");
 
-		assertThatThrownBy(() -> McpClient.using(mcpTransport).withRequestTimeout(null).sync())
+		assertThatThrownBy(() -> McpClient.using(mcpTransport).requestTimeout(null).sync())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Request timeout must not be null");
 	}

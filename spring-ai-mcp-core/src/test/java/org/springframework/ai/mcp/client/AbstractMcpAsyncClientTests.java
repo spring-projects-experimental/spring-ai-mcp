@@ -17,7 +17,9 @@
 package org.springframework.ai.mcp.client;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,7 @@ import org.springframework.ai.mcp.spec.McpSchema.CallToolRequest;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptRequest;
 import org.springframework.ai.mcp.spec.McpSchema.Prompt;
 import org.springframework.ai.mcp.spec.McpSchema.Resource;
+import org.springframework.ai.mcp.spec.McpSchema.Root;
 import org.springframework.ai.mcp.spec.McpSchema.Tool;
 import org.springframework.ai.mcp.spec.McpTransport;
 
@@ -64,7 +67,7 @@ public abstract class AbstractMcpAsyncClientTests {
 		this.mcpTransport = createMcpTransport();
 
 		assertThatCode(() -> {
-			mcpAsyncClient = McpClient.using(mcpTransport).withRequestTimeout(TIMEOUT).async();
+			mcpAsyncClient = McpClient.using(mcpTransport).requestTimeout(TIMEOUT).async();
 			mcpAsyncClient.initialize().block(Duration.ofSeconds(10));
 		}).doesNotThrowAnyException();
 	}
@@ -83,7 +86,7 @@ public abstract class AbstractMcpAsyncClientTests {
 		assertThatThrownBy(() -> McpClient.using(null).sync()).isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Transport must not be null");
 
-		assertThatThrownBy(() -> McpClient.using(mcpTransport).withRequestTimeout(null).sync())
+		assertThatThrownBy(() -> McpClient.using(mcpTransport).requestTimeout(null).sync())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Request timeout must not be null");
 	}
@@ -121,11 +124,6 @@ public abstract class AbstractMcpAsyncClientTests {
 		CallToolRequest invalidRequest = new CallToolRequest("nonexistent_tool", Map.of("message", ECHO_TEST_MESSAGE));
 
 		assertThatThrownBy(() -> mcpAsyncClient.callTool(invalidRequest).block()).isInstanceOf(Exception.class);
-	}
-
-	@Test
-	void testRootsListChanged() {
-		assertThatCode(() -> mcpAsyncClient.sendRootsListChanged().block()).doesNotThrowAnyException();
 	}
 
 	@Test
@@ -173,6 +171,23 @@ public abstract class AbstractMcpAsyncClientTests {
 				});
 			})
 			.verifyComplete();
+	}
+
+	@Test
+	void testRootsListChanged() {
+		assertThatCode(() -> mcpAsyncClient.sendRootsListChanged().block()).doesNotThrowAnyException();
+	}
+
+	@Test
+	void testInitializeWithRootsListProviders() {
+		var transport = createMcpTransport();
+		List<Supplier<List<Root>>> providers = List.of(() -> List.of(new Root("file:///test/path", "test-root")));
+
+		var client = new McpAsyncClient(transport, TIMEOUT, providers, true);
+
+		assertThatCode(() -> client.initialize().block(Duration.ofSeconds(10))).doesNotThrowAnyException();
+
+		assertThatCode(() -> client.closeGracefully().block(Duration.ofSeconds(10))).doesNotThrowAnyException();
 	}
 
 }

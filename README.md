@@ -6,7 +6,7 @@ Java SDK for the Model Context Protocol (MCP), providing seamless integration be
 
 Spring AI MCP is an experimental project that provides Java and Spring Framework integration for the [Model Context Protocol](https://modelcontextprotocol.org/docs/concepts/architecture). It enables Java applications to interact with AI models and tools through a standardized interface, supporting both synchronous and asynchronous communication patterns.
 
-<img src="spring-ai-mcp-architecture.jpg" width="600">
+<img src="docs/spring-ai-mcp-architecture.jpg" width="600">
 
 ## Modules
 

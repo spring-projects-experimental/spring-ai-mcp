@@ -42,7 +42,7 @@ public class ClientSessionTests3 {
 		try {
 
 			clientSession = McpClient.using(new StdioClientTransport(stdioParams))
-				.withRequestTimeout(Duration.ofSeconds(10))
+				.requestTimeout(Duration.ofSeconds(10))
 				.sync();
 
 			clientSession.initialize();

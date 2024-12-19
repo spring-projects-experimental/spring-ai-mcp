@@ -16,19 +16,27 @@
 package org.springframework.ai.mcp.client;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import org.springframework.ai.mcp.spec.DefaultMcpSession;
+import org.springframework.ai.mcp.spec.DefaultMcpSession.RequestHandler;
 import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptRequest;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptResult;
 import org.springframework.ai.mcp.spec.McpSchema.ListPromptsResult;
 import org.springframework.ai.mcp.spec.McpSchema.PaginatedRequest;
+import org.springframework.ai.mcp.spec.McpSchema.Root;
 import org.springframework.ai.mcp.spec.McpTransport;
 
 /**
@@ -52,22 +60,61 @@ public class McpAsyncClient {
 	private final DefaultMcpSession mcpSession;
 
 	/**
-	 * Create a new McpAsyncClient with the given transport.
-	 * @param transport the transport to use.
+	 * Roots define the boundaries of where servers can operate within the filesystem,
+	 * allowing them to understand which directories and files they have access to.
+	 * Servers can request the list of roots from supporting clients and receive
+	 * notifications when that list changes.
 	 */
-	public McpAsyncClient(McpTransport transport) {
-		this(transport, Duration.ofSeconds(20));
-	}
+	private McpSchema.ClientCapabilities.RootCapabilities rootCapabilities;
 
 	/**
 	 * Create a new McpAsyncClient with the given transport and session request-response
 	 * timeout.
 	 * @param transport the transport to use.
 	 * @param requestTimeout the session request-response timeout.
+	 * @param rootsListProviders the list of suppliers that provide the list of roots
+	 * backing the roots list request.
+	 * @param rootsListChangedNotification whether the client supports roots/list_changed
+	 * notification.
 	 */
-	public McpAsyncClient(McpTransport transport, Duration requestTimeout) {
-		this.mcpSession = new DefaultMcpSession(requestTimeout, transport);
+	public McpAsyncClient(McpTransport transport, Duration requestTimeout,
+			List<Supplier<List<Root>>> rootsListProviders, boolean rootsListChangedNotification) {
+
+		Map<String, RequestHandler> requestHanlers = new HashMap<>();
+
+		if (rootsListProviders != null && !rootsListProviders.isEmpty()) {
+			requestHanlers.put("roots/list", rootsListRequestHandler(rootsListProviders));
+			this.rootCapabilities = new McpSchema.ClientCapabilities.RootCapabilities(rootsListChangedNotification);
+		}
+
+		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHanlers, Map.of());
+
 	}
+
+	private RequestHandler rootsListRequestHandler(List<Supplier<List<Root>>> rootsListProviders) {
+		return new RequestHandler() {
+			@Override
+			public Mono<Object> handle(Object params) {
+				if (rootsListProviders == null || rootsListProviders.isEmpty()) {
+					return Mono.just(new ArrayList<Root>());
+				}
+
+				List<Mono<List<Root>>> monos = rootsListProviders.stream()
+					.map(supplier -> Mono.fromSupplier(supplier).subscribeOn(Schedulers.boundedElastic()))
+					.toList();
+
+				return Mono.zip(monos, arrays -> {
+					List<Root> combinedList = new ArrayList<>();
+					for (Object array : arrays) {
+						@SuppressWarnings("unchecked")
+						List<Root> roots = (List<Root>) array;
+						combinedList.addAll(roots);
+					}
+					return combinedList;
+				});
+			}
+		};
+	};
 
 	/**
 	 * The initialization phase MUST be the first interaction between client and server.
@@ -100,8 +147,8 @@ public class McpAsyncClient {
 	public Mono<McpSchema.InitializeResult> initialize() {
 		McpSchema.InitializeRequest initializeRequest = new McpSchema.InitializeRequest(// @formatter:off
 				McpSchema.LATEST_PROTOCOL_VERSION,
-				new McpSchema.ClientCapabilities(null, new McpSchema.ClientCapabilities.RootCapabilities(true), null),
-				new McpSchema.Implementation("mcp-java-client", "0.0.1")); // @formatter:on
+				new McpSchema.ClientCapabilities(null, rootCapabilities, null),
+				new McpSchema.Implementation("mcp-java-client", "0.2.0")); // @formatter:on
 
 		Mono<McpSchema.InitializeResult> result = this.mcpSession.sendRequest("initialize", initializeRequest,
 				new TypeReference<McpSchema.InitializeResult>() {

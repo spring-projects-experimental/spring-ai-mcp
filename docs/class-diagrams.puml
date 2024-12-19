@@ -1,0 +1,132 @@
+@startuml Core Components
+
+interface McpTransport {
+  +Mono<Void> connect(Function<Mono<JSONRPCMessage>, 
+                       Mono<JSONRPCMessage>> handler)
+  +Mono<Void> sendMessage()
+  +void close()
+  +Mono<Void> closeGracefully()
+}
+
+interface McpSession {
+  +<T> Mono<T> sendRequest(String method, Object requestParams, TypeReference<T> typeRef)
+  +Mono<Void> sendNotification(String method, Map<String, Object> params)
+  +Mono<Void> closeGracefully()
+  +close()
+}
+
+class DefaultMcpSession {
+  -McpTransport transport
+  -ObjectMapper objectMapper
+}
+
+class McpClient {
+  +{static} async()
+  +{static} sync()
+}
+
+class McpAsyncClient {
+  +Mono<InitializeResult> initialize()
+  +Mono<CallToolResult> callTool()
+  +Mono<ListToolsResult> listTools()
+  +Mono<ListResourcesResult> listResources()
+  +Mono<ReadResourceResult> readResource()
+  +Mono<ListPromptsResult> listPrompts()
+  +Mono<GetPromptResult> getPrompt()
+}
+
+class McpSyncClient {
+  +InitializeResult initialize()
+  +CallToolResult callTool()
+  +ListToolsResult listTools()
+  +ListResourcesResult listResources()
+  +ReadResourceResult readResource()
+  +ListPromptsResult listPrompts()
+  +GetPromptResult getPrompt()
+}
+
+class StdioClientTransport {
+  -Process serverProcess
+  -ServerParameters parameters
+}
+
+class SseClientTransport {
+  -WebClient webClient
+}
+
+class McpSchema {
+  +class ErrorCodes
+  +interface Request
+  +interface JSONRPCMessage
+  +interface ResourceContents
+  +interface Content
+}
+
+class McpError {
+  -int code
+  -String message
+}
+
+McpTransport <|-- StdioClientTransport
+McpTransport <|-- SseClientTransport
+McpSession <|-- DefaultMcpSession
+DefaultMcpSession --o McpAsyncClient
+McpClient ..> McpAsyncClient : creates
+McpClient ..> McpSyncClient : creates
+McpSyncClient o-- McpAsyncClient
+DefaultMcpSession o-- McpTransport
+McpSchema <.. McpSession : uses
+McpError ..> McpSession : throws
+
+@enduml
+
+@startuml Message Flow
+
+package "MCP Schema" {
+  interface JSONRPCMessage {
+    +String jsonrpc()
+  }
+  
+  interface Request {
+  }
+  
+  class InitializeRequest
+  class CallToolRequest
+  class CreateMessageRequest
+  class CompleteRequest
+  class GetPromptRequest
+}
+
+package "Resource Types" {
+  interface ResourceContents {
+    +String uri()
+    +String mimeType()
+  }
+  
+  class TextResourceContents
+  class BlobResourceContents
+  
+  interface Content {
+    +String type()
+  }
+  
+  class TextContent
+  class ImageContent
+  class EmbeddedResource
+}
+
+JSONRPCMessage <|.. Request
+Request <|.. InitializeRequest
+Request <|.. CallToolRequest
+Request <|.. CreateMessageRequest
+Request <|.. CompleteRequest
+Request <|.. GetPromptRequest
+
+ResourceContents <|.. TextResourceContents
+ResourceContents <|.. BlobResourceContents
+
+Content <|.. TextContent
+Content <|.. ImageContent
+Content <|.. EmbeddedResource
+
+@enduml

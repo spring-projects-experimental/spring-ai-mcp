@@ -109,15 +109,6 @@ public class DefaultMcpSession implements McpSession {
 	}
 
 	/**
-	 * Creates a new DefaultMcpSession with the specified configuration.
-	 * @param requestTimeout Duration to wait for responses
-	 * @param transport Transport implementation for message exchange
-	 */
-	public DefaultMcpSession(Duration requestTimeout, McpTransport transport) {
-		this(requestTimeout, transport, Map.of(), Map.of());
-	}
-
-	/**
 	 * Creates a new DefaultMcpSession with the specified configuration and handlers.
 	 * @param requestTimeout Duration to wait for responses
 	 * @param transport Transport implementation for message exchange

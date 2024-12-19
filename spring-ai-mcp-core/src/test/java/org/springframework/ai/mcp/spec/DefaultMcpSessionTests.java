@@ -62,8 +62,6 @@ class DefaultMcpSessionTests {
 
 	private MockMcpTransport transport;
 
-	private ObjectMapper objectMapper;
-
 	@SuppressWarnings("unused")
 	private static class MockMcpTransport implements McpTransport {
 
@@ -124,7 +122,6 @@ class DefaultMcpSessionTests {
 
 	@BeforeEach
 	void setUp() {
-		objectMapper = new ObjectMapper();
 		transport = new MockMcpTransport();
 		session = new DefaultMcpSession(TIMEOUT, transport, Map.of(),
 				Map.of(TEST_NOTIFICATION, params -> Mono.fromRunnable(() -> logger.info("Status update: " + params))));
@@ -139,10 +136,12 @@ class DefaultMcpSessionTests {
 
 	@Test
 	void testConstructorWithInvalidArguments() {
-		assertThatThrownBy(() -> new DefaultMcpSession(null, transport)).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> new DefaultMcpSession(null, transport, Map.of(), Map.of()))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("requstTimeout can not be null");
 
-		assertThatThrownBy(() -> new DefaultMcpSession(TIMEOUT, null)).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> new DefaultMcpSession(TIMEOUT, null, Map.of(), Map.of()))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("transport can not be null");
 	}
 
