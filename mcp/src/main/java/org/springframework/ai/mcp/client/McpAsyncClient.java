@@ -138,7 +138,7 @@ public class McpAsyncClient {
 				}
 
 				List<Mono<List<Root>>> monos = rootsListProviders.stream()
-					.map(supplier -> Mono.fromSupplier(supplier).subscribeOn(Schedulers.boundedElastic()))
+					.map(supplier -> Mono.fromSupplier(supplier))
 					.toList();
 
 				return Mono.zip(monos, arrays -> {
@@ -165,7 +165,7 @@ public class McpAsyncClient {
 					for (Consumer<List<McpSchema.Tool>> toolsChangeConsumer : toolsChangeConsumers) {
 						toolsChangeConsumer.accept(listToolsResult.tools());
 					}
-				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+				})).onErrorResume(error -> {
 					logger.error("Error handling tools list change notification", error);
 					return Mono.empty();
 				}).then(); // Convert to Mono<Void>
@@ -184,7 +184,7 @@ public class McpAsyncClient {
 					for (Consumer<List<McpSchema.Resource>> resourceChangeConsumer : resourcesChangeConsumers) {
 						resourceChangeConsumer.accept(listResourcesResult.resources());
 					}
-				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+				})).onErrorResume(error -> {
 					logger.error("Error handling resources list change notification", error);
 					return Mono.empty();
 				}).then(); // Convert to Mono<Void>
@@ -203,7 +203,7 @@ public class McpAsyncClient {
 					for (Consumer<List<McpSchema.Prompt>> promptChangeConsumer : promptsChangeConsumers) {
 						promptChangeConsumer.accept(listPromptsResult.prompts());
 					}
-				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+				})).onErrorResume(error -> {
 					logger.error("Error handling prompts list change notification", error);
 					return Mono.empty();
 				}).then(); // Convert to Mono<Void>
