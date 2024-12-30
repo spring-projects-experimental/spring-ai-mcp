@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolRequest;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
 import org.springframework.ai.mcp.spec.McpSchema.ClientCapabilities;
@@ -275,6 +276,40 @@ public abstract class AbstractMcpSyncClientTests {
 			client.promptListChangedNotification();
 			client.close();
 		}).doesNotThrowAnyException();
+	}
+
+	// ---------------------------------------
+	// Logging Tests
+	// ---------------------------------------
+
+	@Test
+	void testLoggingLevels() {
+		// Test all logging levels
+		for (McpSchema.LoggingLevel level : McpSchema.LoggingLevel.values()) {
+			assertThatCode(() -> mcpSyncClient.setLoggingLevel(level)).doesNotThrowAnyException();
+		}
+	}
+
+	@Test
+	void testLoggingConsumer() {
+		AtomicBoolean logReceived = new AtomicBoolean(false);
+		var transport = createMcpTransport();
+
+		var client = McpClient.using(transport)
+			.requestTimeout(TIMEOUT)
+			.loggingConsumer(notification -> logReceived.set(true))
+			.sync();
+
+		assertThatCode(() -> {
+			client.initialize();
+			client.close();
+		}).doesNotThrowAnyException();
+	}
+
+	@Test
+	void testLoggingWithNullNotification() {
+		assertThatThrownBy(() -> mcpSyncClient.setLoggingLevel(null))
+			.hasMessageContaining("Logging level must not be null");
 	}
 
 }

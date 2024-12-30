@@ -28,7 +28,6 @@ import org.springframework.ai.model.function.FunctionCallback;
 
 /**
  * @author Christian Tzolov
- * @since 1.0.0
  */
 
 public class McpFunctionCallback implements FunctionCallback {

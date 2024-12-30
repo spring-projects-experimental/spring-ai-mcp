@@ -186,6 +186,63 @@ McpTransport transport = new SseClientTransport(webClientBuilder);
 ```
 
 
+### Client Capabilities
+
+The client can be configured with various capabilities:
+
+```java
+var capabilities = ClientCapabilities.builder()
+    .roots(true)      // Enable filesystem roots support with list changes notifications
+    .sampling()       // Enable LLM sampling support
+    .build();
+```
+
+#### Roots Support
+
+Roots define the boundaries of where servers can operate within the filesystem:
+
+```java
+// Add a root dynamically
+client.addRoot(new Root("file:///path", "description"));
+
+// Remove a root
+client.removeRoot("file:///path");
+
+// Notify server of roots changes
+client.rootsListChangedNotification();
+```
+
+The roots capability allows servers to:
+- Request the list of accessible filesystem roots
+- Receive notifications when the root list changes
+- Understand which directories and files they have access to
+
+#### Sampling Support
+
+Sampling enables servers to request LLM interactions ("completions" or "generations") through the client:
+
+```java
+// Configure sampling handler
+Function<CreateMessageRequest, CreateMessageResult> samplingHandler = request -> {
+    // Sampling implementation that interfaces with LLM
+    return new CreateMessageResult(response);
+};
+
+// Create client with sampling support
+var client = McpClient.using(transport)
+    .capabilities(ClientCapabilities.builder()
+        .sampling()
+        .build())
+    .samplingHandler(samplingHandler)
+    .build();
+```
+
+This capability allows:
+- Servers to leverage AI capabilities without requiring API keys
+- Clients to maintain control over model access and permissions
+- Support for both text and image-based interactions
+- Optional inclusion of MCP server context in prompts
+
 ## Server Usage Examples
 
 ### MCP Server (Sync API)
@@ -307,10 +364,36 @@ var capabilities = ServerCapabilities.builder()
     .resources(false, true)  // Resource support with list changes notifications
     .tools(true)            // Tool support with list changes notifications
     .prompts(true)          // Prompt support with list changes notifications
+    .logging()              // Enable logging support (enabled by default with loging level INFO)
     .build();
 ```
 
-### Tool Registration
+#### Logging Support
+
+The server provides structured logging capabilities that allow sending log messages to clients with different severity levels:
+
+```java
+// Send a log message to clients
+server.loggingNotification(LoggingMessageNotification.builder()
+    .level(LoggingLevel.INFO)
+    .logger("custom-logger")
+    .data("Custom log message")
+    .build());
+```
+
+Supported logging levels (in order of increasing severity):
+- DEBUG (0)
+- INFO (1)
+- NOTICE (2)
+- WARNING (3)
+- ERROR (4)
+- CRITICAL (5)
+- ALERT (6)
+- EMERGENCY (7)
+
+Clients can control the minimum logging level they receive through the `mcpClient.setLoggingLevel(level)` request. Messages below the set level will be filtered out.
+
+#### Tool Registration
 
 ```java
 var toolRegistration = new ToolRegistration(
@@ -326,7 +409,7 @@ var toolRegistration = new ToolRegistration(
 );
 ```
 
-### Resource Registration
+#### Resource Registration
 
 ```java
 var resourceRegistration = new ResourceRegistration(
@@ -338,7 +421,7 @@ var resourceRegistration = new ResourceRegistration(
 );
 ```
 
-### Prompt Registration
+#### Prompt Registration
 
 ```java
 var promptRegistration = new PromptRegistration(

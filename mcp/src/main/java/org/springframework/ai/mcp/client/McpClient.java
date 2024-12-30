@@ -71,6 +71,9 @@ import org.springframework.ai.mcp.util.Assert;
  *     .clientInfo(new Implementation("My Client", "1.0.0"))
  *     .roots(new Root("file://workspace", "Workspace Files"))
  *     .toolsChangeConsumer(tools -> System.out.println("Tools updated: " + tools))
+ *     .resourcesChangeConsumer(resources -> System.out.println("Resources updated: " + resources))
+ *     .promptsChangeConsumer(prompts -> System.out.println("Prompts updated: " + prompts))
+ *     .loggingConsumer(message -> System.out.println("Log message: " + message))
  *     .async();
  * }</pre>
  *
@@ -82,6 +85,16 @@ import org.springframework.ai.mcp.util.Assert;
  * <li>Prompt template handling
  * <li>Real-time updates through change consumers
  * <li>Custom sampling strategies
+ * <li>Structured logging with severity levels
+ * </ul>
+ *
+ * <p>
+ * The client supports structured logging through the MCP logging utility:
+ * <ul>
+ * <li>Eight severity levels from DEBUG to EMERGENCY
+ * <li>Optional logger name categorization
+ * <li>Configurable logging consumers
+ * <li>Server-controlled minimum log level
  * </ul>
  *
  * @author Christian Tzolov
@@ -140,6 +153,8 @@ public interface McpClient {
 		private List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers = new ArrayList<>();
 
 		private List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers = new ArrayList<>();
+
+		private List<Consumer<McpSchema.LoggingMessageNotification>> loggingConsumers = new ArrayList<>();
 
 		private Function<CreateMessageRequest, CreateMessageResult> samplingHandler;
 
@@ -285,6 +300,34 @@ public interface McpClient {
 		}
 
 		/**
+		 * Adds a consumer to be notified when logging messages are received from the
+		 * server. This allows the client to react to log messages, such as warnings or
+		 * errors, that are sent by the server.
+		 * @param loggingConsumer A consumer that receives logging messages. Must not be
+		 * null.
+		 * @return This builder instance for method chaining
+		 */
+		public Builder loggingConsumer(Consumer<McpSchema.LoggingMessageNotification> loggingConsumer) {
+			Assert.notNull(loggingConsumer, "Logging consumer must not be null");
+			this.loggingConsumers.add(loggingConsumer);
+			return this;
+		}
+
+		/**
+		 * Adds multiple consumers to be notified when logging messages are received from
+		 * the server. This allows the client to react to log messages, such as warnings
+		 * or errors, that are sent by the server.
+		 * @param loggingConsumers A list of consumers that receive logging messages. Must
+		 * not be null.
+		 * @return This builder instance for method chaining
+		 */
+		public Builder loggingConsumers(List<Consumer<McpSchema.LoggingMessageNotification>> loggingConsumers) {
+			Assert.notNull(loggingConsumers, "Logging consumers must not be null");
+			this.loggingConsumers.addAll(loggingConsumers);
+			return this;
+		}
+
+		/**
 		 * Builds a synchronous MCP client that provides blocking operations. Synchronous
 		 * clients wait for each operation to complete before returning, making them
 		 * simpler to use but potentially less performant for concurrent operations.
@@ -304,7 +347,7 @@ public interface McpClient {
 		 */
 		public McpAsyncClient async() {
 			return new McpAsyncClient(transport, requestTimeout, clientInfo, capabilities, roots, toolsChangeConsumers,
-					resourcesChangeConsumers, promptsChangeConsumers, samplingHandler);
+					resourcesChangeConsumers, promptsChangeConsumers, loggingConsumers, samplingHandler);
 		}
 
 	}

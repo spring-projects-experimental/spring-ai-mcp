@@ -254,11 +254,16 @@ public class McpSchema {
 	@JsonInclude(JsonInclude.Include.NON_ABSENT)
 	public record ServerCapabilities( // @formatter:off
 		@JsonProperty("experimental") Map<String, Object> experimental,
-		@JsonProperty("logging") Object logging,
+		@JsonProperty("logging") LoggingCapabilities logging,
 		@JsonProperty("prompts") PromptCapabilities prompts,
 		@JsonProperty("resources") ResourceCapabilities resources,
 		@JsonProperty("tools") ToolCapabilities tools) {
-		
+
+			
+		@JsonInclude(JsonInclude.Include.NON_ABSENT)
+		public record LoggingCapabilities() {
+		}
+	
 		@JsonInclude(JsonInclude.Include.NON_ABSENT)
 		public record PromptCapabilities(
 			@JsonProperty("listChanged") Boolean listChanged) {
@@ -282,7 +287,7 @@ public class McpSchema {
 		public static class Builder {
 
 			private Map<String, Object> experimental;
-			private Object logging;
+			private LoggingCapabilities logging = new LoggingCapabilities();
 			private PromptCapabilities prompts;
 			private ResourceCapabilities resources;
 			private ToolCapabilities tools;
@@ -292,8 +297,8 @@ public class McpSchema {
 				return this;
 			}
 
-			public Builder logging(Object logging) {
-				this.logging = logging;
+			public Builder logging() {
+				this.logging = new LoggingCapabilities();
 				return this;
 			}
 
@@ -330,19 +335,6 @@ public class McpSchema {
 		@JsonProperty("user") USER,
 		@JsonProperty("assistant") ASSISTANT
 	}// @formatter:on
-
-	public enum LoggingLevel {// @formatter:off
-
-		@JsonProperty("debug") DEBUG,
-		@JsonProperty("info") INFO,
-		@JsonProperty("notice") NOTICE,
-		@JsonProperty("warning") WARNING,
-		@JsonProperty("error") ERROR,
-		@JsonProperty("critical") CRITICAL,
-		@JsonProperty("alert") ALERT,
-		@JsonProperty("emergency") EMERGENCY
-
-	} // @formatter:on
 
 	// ---------------------------
 	// Resource Interfaces
@@ -752,11 +744,72 @@ public class McpSchema {
 		@JsonProperty("total") Double total) {
 	}// @formatter:on
 
+	/**
+	 * The Model Context Protocol (MCP) provides a standardized way for servers to send
+	 * structured log messages to clients. Clients can control logging verbosity by
+	 * setting minimum log levels, with servers sending notifications containing severity
+	 * levels, optional logger names, and arbitrary JSON-serializable data.
+	 *
+	 * @param level The severity levels. The mimimum log level is set by the client.
+	 * @param logger The logger that generated the message.
+	 * @param data JSON-serializable logging data.
+	 */
 	public record LoggingMessageNotification(// @formatter:off
 		@JsonProperty("level") LoggingLevel level,
 		@JsonProperty("logger") String logger,
-		@JsonProperty("data") Object data) {
+		@JsonProperty("data") String data) {
+
+		public static Builder builder() {
+			return new Builder();
+		}
+
+		public static class Builder {
+			private LoggingLevel level = LoggingLevel.INFO;
+			private String logger = "server";
+			private String data;
+
+			public Builder level(LoggingLevel level) {
+				this.level = level;
+				return this;
+			}
+
+			public Builder logger(String logger) {
+				this.logger = logger;
+				return this;
+			}
+
+			public Builder data(String data) {
+				this.data = data;
+				return this;
+			}
+
+			public LoggingMessageNotification build() {
+				return new LoggingMessageNotification(level, logger, data);
+			}
+		}
 	}// @formatter:on
+
+	public enum LoggingLevel {// @formatter:off
+		@JsonProperty("debug") DEBUG(0),
+		@JsonProperty("info") INFO(1),
+		@JsonProperty("notice") NOTICE(2),
+		@JsonProperty("warning") WARNING(3),
+		@JsonProperty("error") ERROR(4),
+		@JsonProperty("critical") CRITICAL(5),
+		@JsonProperty("alert") ALERT(6),
+		@JsonProperty("emergency") EMERGENCY(7);
+
+		private final int level;
+
+		LoggingLevel(int level) {
+			this.level = level;
+		}
+
+		public int level() {
+			return level;
+		}
+
+	} // @formatter:on
 
 	// ---------------------------
 	// Autocomplete

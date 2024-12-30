@@ -44,6 +44,8 @@ import org.springframework.ai.mcp.spec.McpSchema.GetPromptRequest;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptResult;
 import org.springframework.ai.mcp.spec.McpSchema.Implementation;
 import org.springframework.ai.mcp.spec.McpSchema.ListPromptsResult;
+import org.springframework.ai.mcp.spec.McpSchema.LoggingLevel;
+import org.springframework.ai.mcp.spec.McpSchema.LoggingMessageNotification;
 import org.springframework.ai.mcp.spec.McpSchema.PaginatedRequest;
 import org.springframework.ai.mcp.spec.McpSchema.Root;
 import org.springframework.ai.mcp.spec.McpTransport;
@@ -114,6 +116,7 @@ public class McpAsyncClient {
 	 * @param toolsChangeConsumers the tools change consumers.
 	 * @param resourcesChangeConsumers the resources change consumers.
 	 * @param promptsChangeConsumers the prompts change consumers.
+	 * @param loggingConsumers the logging consumers.
 	 * @param samplingHandler the sampling handler.
 	 */
 	public McpAsyncClient(McpTransport transport, Duration requestTimeout, Implementation clientInfo,
@@ -121,6 +124,7 @@ public class McpAsyncClient {
 			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers,
 			List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers,
 			List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers,
+			List<Consumer<McpSchema.LoggingMessageNotification>> loggingConsumers,
 			Function<CreateMessageRequest, CreateMessageResult> samplingHandler) {
 
 		Assert.notNull(transport, "Transport must not be null");
@@ -180,6 +184,14 @@ public class McpAsyncClient {
 		}
 		notificationHandlers.put("notifications/prompts/list_changed",
 				promptsChangeNotificationHandler(promptsChangeConsumersFinal));
+
+		// Utility Logging Notification
+		List<Consumer<LoggingMessageNotification>> loggingConsumersFinal = new ArrayList<>();
+		loggingConsumersFinal.add((notification) -> logger.info("Logging: {}", notification));
+		if (!Utils.isEmpty(loggingConsumers)) {
+			loggingConsumersFinal.addAll(loggingConsumers);
+		}
+		notificationHandlers.put("notifications/log", loggingNotificationHandler(loggingConsumersFinal));
 
 		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHanlers, notificationHandlers);
 
@@ -427,20 +439,30 @@ public class McpAsyncClient {
 	private NotificationHandler toolsChangeNotificationHandler(
 			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers) {
 
-		return new NotificationHandler() {
-			@Override
-			public Mono<Void> handle(Object params) {
-				// TODO: add support for cursor/pagination
-				return listTools().flatMap(listToolsResult -> Mono.fromRunnable(() -> {
-					for (Consumer<List<McpSchema.Tool>> toolsChangeConsumer : toolsChangeConsumers) {
-						toolsChangeConsumer.accept(listToolsResult.tools());
-					}
-				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
-					logger.error("Error handling tools list change notification", error);
-					return Mono.empty();
-				}).then(); // Convert to Mono<Void>
+		return params -> listTools().flatMap(listToolsResult -> Mono.fromRunnable(() -> {
+			for (Consumer<List<McpSchema.Tool>> toolsChangeConsumer : toolsChangeConsumers) {
+				toolsChangeConsumer.accept(listToolsResult.tools());
 			}
-		};
+		}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+			logger.error("Error handling tools list change notification", error);
+			return Mono.empty();
+		}).then(); // Convert to Mono<Void>
+		// return new NotificationHandler() {
+		// @Override
+		// public Mono<Void> handle(Object params) {
+		// // TODO: add support for cursor/pagination
+		// return listTools().flatMap(listToolsResult -> Mono.fromRunnable(() -> {
+		// for (Consumer<List<McpSchema.Tool>> toolsChangeConsumer :
+		// toolsChangeConsumers)
+		// {
+		// toolsChangeConsumer.accept(listToolsResult.tools());
+		// }
+		// }).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+		// logger.error("Error handling tools list change notification", error);
+		// return Mono.empty();
+		// }).then(); // Convert to Mono<Void>
+		// }
+		// };
 	};
 
 	// --------------------------
@@ -552,20 +574,31 @@ public class McpAsyncClient {
 	private NotificationHandler resourcesChangeNotificationHandler(
 			List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers) {
 
-		return new NotificationHandler() {
-			@Override
-			public Mono<Void> handle(Object params) {
-				// TODO: add support for cursor/pagination
-				return listResources().flatMap(listResourcesResult -> Mono.fromRunnable(() -> {
-					for (Consumer<List<McpSchema.Resource>> resourceChangeConsumer : resourcesChangeConsumers) {
-						resourceChangeConsumer.accept(listResourcesResult.resources());
-					}
-				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
-					logger.error("Error handling resources list change notification", error);
-					return Mono.empty();
-				}).then(); // Convert to Mono<Void>
+		return params -> listResources().flatMap(listResourcesResult -> Mono.fromRunnable(() -> {
+			for (Consumer<List<McpSchema.Resource>> resourceChangeConsumer : resourcesChangeConsumers) {
+				resourceChangeConsumer.accept(listResourcesResult.resources());
 			}
-		};
+		}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+			logger.error("Error handling resources list change notification", error);
+			return Mono.empty();
+		}).then();
+
+		// return new NotificationHandler() {
+		// @Override
+		// public Mono<Void> handle(Object params) {
+		// // TODO: add support for cursor/pagination
+		// return listResources().flatMap(listResourcesResult -> Mono.fromRunnable(() ->
+		// {
+		// for (Consumer<List<McpSchema.Resource>> resourceChangeConsumer :
+		// resourcesChangeConsumers) {
+		// resourceChangeConsumer.accept(listResourcesResult.resources());
+		// }
+		// }).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+		// logger.error("Error handling resources list change notification", error);
+		// return Mono.empty();
+		// }).then(); // Convert to Mono<Void>
+		// }
+		// };
 	};
 
 	// --------------------------
@@ -616,20 +649,60 @@ public class McpAsyncClient {
 	private NotificationHandler promptsChangeNotificationHandler(
 			List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers) {
 
-		return new NotificationHandler() {
-			@Override
-			public Mono<Void> handle(Object params) {
-				// TODO: add support for cursor/pagination
-				return listPrompts().flatMap(listPromptsResult -> Mono.fromRunnable(() -> {
-					for (Consumer<List<McpSchema.Prompt>> promptChangeConsumer : promptsChangeConsumers) {
-						promptChangeConsumer.accept(listPromptsResult.prompts());
-					}
-				}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
-					logger.error("Error handling prompts list change notification", error);
-					return Mono.empty();
-				}).then(); // Convert to Mono<Void>
-			}
-		};
+		return params -> {// @formatter:off
+			return listPrompts().flatMap(listPromptsResult -> Mono.fromRunnable(() -> {
+				for (Consumer<List<McpSchema.Prompt>> promptChangeConsumer : promptsChangeConsumers) {
+					promptChangeConsumer.accept(listPromptsResult.prompts());
+				}
+			}).subscribeOn(Schedulers.boundedElastic())).onErrorResume(error -> {
+				logger.error("Error handling prompts list change notification", error);
+				return Mono.empty();
+			}).then(); // Convert to Mono<Void>
+		}; // @formatter:on
 	};
+
+	// --------------------------
+	// Logging
+	// --------------------------
+	/**
+	 * Create a notification handler for logging notifications from the server. This
+	 * handler automatically distributes logging messages to all registered consumers.
+	 * @param loggingConsumers List of consumers that will be notified when a logging
+	 * message is received. Each consumer receives the logging message notification.
+	 * @return A NotificationHandler that processes log notifications by distributing the
+	 * message to all registered consumers
+	 */
+	private NotificationHandler loggingNotificationHandler(
+			List<Consumer<LoggingMessageNotification>> loggingConsumers) {
+
+		return params -> {
+
+			McpSchema.LoggingMessageNotification loggingMessageNotification = transport.unmarshalFrom(params,
+					new TypeReference<McpSchema.LoggingMessageNotification>() {
+					});
+
+			return Mono.fromRunnable(() -> {
+				for (Consumer<LoggingMessageNotification> loggingConsumer : loggingConsumers) {
+					loggingConsumer.accept(loggingMessageNotification);
+				}
+			}).subscribeOn(Schedulers.boundedElastic()).then();
+
+		};
+	}
+
+	/**
+	 * Client can set the minimum logging level it wants to receive from the server.
+	 * @param loggingLevel the min logging level
+	 */
+	public Mono<Void> setLoggingLevel(LoggingLevel loggingLevel) {
+		Assert.notNull(loggingLevel, "Logging level must not be null");
+
+		String levelName = this.transport.unmarshalFrom(loggingLevel, new TypeReference<String>() {
+		});
+
+		Map<String, Object> params = Map.of("level", levelName);
+
+		return this.mcpSession.sendNotification("logging/setLevel", params);
+	}
 
 }

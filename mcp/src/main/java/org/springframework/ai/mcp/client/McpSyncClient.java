@@ -29,7 +29,7 @@ import org.springframework.ai.mcp.util.Assert;
 
 /**
  * A synchronous client for the Model Context Protocol (MCP).
- * 
+ *
  * @author Dariusz Jędrzejczyk
  * @author Christian Tzolov
  */
@@ -278,6 +278,14 @@ public class McpSyncClient implements AutoCloseable {
 	 */
 	public void promptListChangedNotification() {
 		this.delegate.promptListChangedNotification().block();
+	}
+
+	/**
+	 * Client can set the minimum logging level it wants to receive from the server.
+	 * @param loggingLevel the min logging level
+	 */
+	public void setLoggingLevel(McpSchema.LoggingLevel loggingLevel) {
+		this.delegate.setLoggingLevel(loggingLevel).block();
 	}
 
 }

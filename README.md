@@ -16,7 +16,7 @@ The project consists of two main modules:
 
 Java implementation of the Model Context Protocol specification. It includes:
 - Synchronous and asynchronous [MCP Client](https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/mcp/README.md#client-usage-examples) and [MCP Server](https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/mcp/README.md#server-usage-examples) implementations
-- Standard MCP operations support (tool discovery, resource management, prompt handling). Support for request and notificaiotn handling.
+- Standard MCP operations support (tool discovery, resource management, prompt handling, structured logging). Support for request and notification handling.
 - [Stdio](https://spec.modelcontextprotocol.io/specification/basic/transports/#stdio) and [SSE](https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse) transport implementations. 
 - [Find more](./mcp/README.md).
 

@@ -16,9 +16,12 @@
 
 package org.springframework.ai.mcp.server;
 
+import reactor.core.publisher.Mono;
+
 import org.springframework.ai.mcp.server.McpServer.PromptRegistration;
 import org.springframework.ai.mcp.server.McpServer.ResourceRegistration;
 import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
+import org.springframework.ai.mcp.spec.McpSchema.LoggingMessageNotification;
 import org.springframework.ai.mcp.util.Assert;
 
 /**
@@ -111,6 +114,14 @@ public class McpSyncServer {
 	 */
 	public void notifyPromptsListChanged() {
 		this.asyncServer.notifyPromptsListChanged().block();
+	}
+
+	/**
+	 * Send a logging message notification to all clients.
+	 * @param loggingMessageNotification The logging message notification to send
+	 */
+	public void loggingNotification(LoggingMessageNotification loggingMessageNotification) {
+		this.asyncServer.loggingNotification(loggingMessageNotification).block();
 	}
 
 	/**

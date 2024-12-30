@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.springframework.ai.mcp.server;
 
 import java.time.Duration;
@@ -22,6 +38,8 @@ import org.springframework.ai.mcp.spec.DefaultMcpSession.NotificationHandler;
 import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
+import org.springframework.ai.mcp.spec.McpSchema.LoggingLevel;
+import org.springframework.ai.mcp.spec.McpSchema.LoggingMessageNotification;
 import org.springframework.ai.mcp.spec.McpSchema.Tool;
 import org.springframework.ai.mcp.spec.McpTransport;
 import org.springframework.ai.mcp.util.Utils;
@@ -59,6 +77,8 @@ public class McpAsyncServer {
 
 	private final ConcurrentHashMap<String, PromptRegistration> prompts;
 
+	private LoggingLevel minLoggingLevel = LoggingLevel.DEBUG;
+
 	/**
 	 * Create a new McpAsyncServer with the given transport and capabilities.
 	 * @param mcpTransport The transport layer implementation for MCP communication
@@ -83,7 +103,8 @@ public class McpAsyncServer {
 
 		this.serverCapabilities = (serverCapabilities != null) ? serverCapabilities : new McpSchema.ServerCapabilities(
 				null, // experimental
-				null, // logging
+				new McpSchema.ServerCapabilities.LoggingCapabilities(), // Enable logging
+																		// by default
 				!Utils.isEmpty(this.prompts) ? new McpSchema.ServerCapabilities.PromptCapabilities(false) : null,
 				!Utils.isEmpty(this.resources) ? new McpSchema.ServerCapabilities.ResourceCapabilities(false, false)
 						: null,
@@ -118,6 +139,11 @@ public class McpAsyncServer {
 		if (!Utils.isEmpty(this.prompts)) {
 			requestHandlers.put("prompts/list", promptsListRequestHandler());
 			requestHandlers.put("prompts/get", promptsGetRequestHandler());
+		}
+
+		// Add logging API handlers if the logging capability is enabled
+		if (this.serverCapabilities.logging() != null) {
+			requestHandlers.put("logging/setLevel", setLoggerRequestHandler());
 		}
 
 		Map<String, NotificationHandler> notificationHandlers = new HashMap<>();
@@ -455,6 +481,50 @@ public class McpAsyncServer {
 			}
 
 			return Mono.error(new McpError("Prompt not found: " + promptRequest.name()));
+		};
+	}
+
+	// ---------------------------------------
+	// Logging Management
+	// ---------------------------------------
+
+	/**
+	 * Send a logging message notification to all connected clients. Messages below the
+	 * current minimum logging level will be filtered out.
+	 * @param loggingMessageNotification The logging message to send
+	 * @return A Mono that completes when the notification has been sent
+	 */
+	public Mono<Void> loggingNotification(LoggingMessageNotification loggingMessageNotification) {
+
+		if (loggingMessageNotification == null) {
+			return Mono.error(new McpError("Logging message must not be null"));
+		}
+
+		Map<String, Object> params = this.transport.unmarshalFrom(loggingMessageNotification,
+				new TypeReference<Map<String, Object>>() {
+				});
+
+		if (loggingMessageNotification.level().level() < minLoggingLevel.level()) {
+			return Mono.empty();
+		}
+
+		return this.mcpSession.sendNotification("notifications/message", params);
+	}
+
+	/**
+	 * Handles requests to set the minimum logging level. Messages below this level will
+	 * not be sent.
+	 * @return A handler that processes logging level change requests
+	 */
+	private DefaultMcpSession.RequestHandler setLoggerRequestHandler() {
+		return params -> {
+			McpSchema.LoggingLevel setLoggerRequest = transport.unmarshalFrom(params,
+					new TypeReference<McpSchema.LoggingLevel>() {
+					});
+
+			this.minLoggingLevel = setLoggerRequest;
+
+			return Mono.empty();
 		};
 	}
 

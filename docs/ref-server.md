@@ -136,10 +136,6 @@ McpServer.using(transport)
     .sync();
 ```
 
-### Implementation Notes
-
-- The server factory uses a builder pattern for configuration
-- Default server info is "mcp-server" version "1.0.0" if not specified
 - Tool handlers must be thread-safe as they may be called concurrently
 - The synchronous server is implemented as a wrapper around the asynchronous server
 - Resource and prompt providers use cursor-based pagination
@@ -160,3 +156,59 @@ Tool handlers implement this interface to define:
 - Tool name and description
 - Input schema for validation
 - Execution logic in the call method
+
+### Logging Capabilities
+
+The MCP Server supports logging functionality that allows sending log messages with different severity levels to the Client. This feature can be enabled through server capabilities configuration.
+
+#### Enabling Logging
+
+```java
+McpServer.using(transport)
+    .serverInfo("my-server", "1.0.0")
+    .capabilities(ServerCapabilities.builder().logging().build())
+    .sync(); // or .async()
+```
+
+#### Logging Levels
+
+The server supports the following logging levels:
+- TRACE
+- DEBUG
+- INFO
+- WARN
+- ERROR
+- FATAL
+
+#### Sending Log Messages
+
+For synchronous servers:
+```java
+LoggingMessageNotification notification = McpSchema.LoggingMessageNotification.builder()
+    .level(McpSchema.LoggingLevel.INFO)
+    .logger("my-logger")
+    .data("Log message")
+    .build();
+
+mcpSyncServer.loggingNotification(notification);
+```
+
+For asynchronous servers:
+```java
+LoggingMessageNotification notification = McpSchema.LoggingMessageNotification.builder()
+    .level(McpSchema.LoggingLevel.INFO)
+    .logger("my-logger")
+    .data("Log message")
+    .build();
+
+mcpAsyncServer.loggingNotification(notification)
+    .subscribe();
+```
+
+- Logging works even if the logging capability is not enabled
+- Null notifications are rejected with a McpError
+- Log messages include:
+  - Level: The severity level of the message
+  - Logger: The name of the logger (typically identifies the source)
+  - Data: The actual log message content
+- The server implementation is transport-agnostic, allowing different transport mechanisms to handle the log messages

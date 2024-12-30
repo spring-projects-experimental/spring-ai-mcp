@@ -15,6 +15,7 @@ import org.springframework.ai.mcp.server.transport.StdioServerTransport;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptResult;
+import org.springframework.ai.mcp.spec.McpSchema.LoggingMessageNotification;
 import org.springframework.ai.mcp.spec.McpSchema.PromptMessage;
 import org.springframework.ai.mcp.spec.McpSchema.Role;
 import org.springframework.ai.mcp.spec.McpSchema.TextContent;
@@ -41,7 +42,8 @@ public class McpServerConfig {
 		return new SseServerTransport(new ObjectMapper(), "/mcp/message");
 	}
 
-	// Router function for SSE transport used by Spring WebFlux to start an HTTP server.
+	// Router function for SSE transport used by Spring WebFlux to start an HTTP
+	// server.
 	@Bean
 	@ConditionalOnProperty(prefix = "transport", name = "mode", havingValue = "sse")
 	public RouterFunction<?> mcpRouterFunction(SseServerTransport transport) {
@@ -56,16 +58,20 @@ public class McpServerConfig {
 			.resources(false, true) // No subscribe support, but list changes notifications
 			.tools(true) // Tool support with list changes notifications
 			.prompts(true) // Prompt support with list changes notifications
+			.logging() // Logging support
 			.build();
 
 		// Create the server with both tool and resource capabilities
-		return McpServer.using(transport)
+		var server = McpServer.using(transport)
 			.info("MCP Demo Server", "1.0.0")
 			.capabilities(capabilities)
 			.resources(systemInfoResourceRegistration())
 			.prompts(greetingPromptRegistration())
-			.tools(weatherToolRegistration(), calculatorToolRegistration())
+			.tools(calculatorToolRegistration())
 			.async();
+		
+		server.addTool(weatherToolRegistration(server));
+		return server; // @formatter:on
 	} // @formatter:on
 
 	private static ResourceRegistration systemInfoResourceRegistration() {
@@ -120,10 +126,17 @@ public class McpServerConfig {
 		});
 	}
 
-	private static ToolRegistration weatherToolRegistration() {
+	private static ToolRegistration weatherToolRegistration(McpAsyncServer server) {
 		return new ToolRegistration(
 				new McpSchema.Tool("weather", "Weather forecast tool by location", Map.of("city", "String")),
 				(arguments) -> {
+
+					server
+						.loggingNotification(LoggingMessageNotification.builder()
+							.data("This is a log message from the weather tool")
+							.build())
+						.block();
+
 					String city = (String) arguments.get("city");
 					TextContent content = new TextContent("Weather forecast for " + city + " is sunny");
 					return new CallToolResult(List.of(content), false);
