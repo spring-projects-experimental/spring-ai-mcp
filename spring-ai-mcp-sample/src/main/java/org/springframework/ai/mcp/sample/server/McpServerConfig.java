@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.ai.mcp.server.McpAsyncServer;
 import org.springframework.ai.mcp.server.McpServer;
@@ -27,6 +29,8 @@ import org.springframework.web.reactive.function.server.RouterFunction;
 
 @Configuration
 public class McpServerConfig {
+
+	private static final Logger logger = LoggerFactory.getLogger(McpServerConfig.class);
 
 	// STDIO transport
 	@Bean
@@ -130,16 +134,23 @@ public class McpServerConfig {
 		return new ToolRegistration(
 				new McpSchema.Tool("weather", "Weather forecast tool by location", Map.of("city", "String")),
 				(arguments) -> {
+					String city = (String) arguments.get("city");
 
+					// Create the result
+					var result = new CallToolResult(
+							List.of(new TextContent("Weather forecast for " + city + " is sunny")), false);
+
+					// Send the logging notification and ignore its completion
 					server
 						.loggingNotification(LoggingMessageNotification.builder()
 							.data("This is a log message from the weather tool")
 							.build())
-						.subscribe();
+						.subscribe(null, error -> {
+							// Log any errors but don't fail the operation
+							logger.error("Failed to send logging notification", error);
+						});
 
-					String city = (String) arguments.get("city");
-					TextContent content = new TextContent("Weather forecast for " + city + " is sunny");
-					return new CallToolResult(List.of(content), false);
+					return result;
 				});
 	}
 

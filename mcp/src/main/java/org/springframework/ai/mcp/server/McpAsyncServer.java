@@ -268,15 +268,11 @@ public class McpAsyncServer {
 
 	private DefaultMcpSession.RequestHandler toolsListRequestHandler() {
 		return params -> {
-			McpSchema.PaginatedRequest request = transport.unmarshalFrom(params,
-					new TypeReference<McpSchema.PaginatedRequest>() {
-					});
 
 			List<Tool> tools = this.tools.stream().map(toolRegistration -> {
 				return toolRegistration.tool();
 			}).toList();
 
-			logger.info("Client tools list request - Cursor: {}", request.cursor());
 			return Mono.just(new McpSchema.ListToolsResult(tools, null));
 		};
 	}
@@ -460,9 +456,10 @@ public class McpAsyncServer {
 
 	private DefaultMcpSession.RequestHandler promptsListRequestHandler() {
 		return params -> {
-			McpSchema.PaginatedRequest request = transport.unmarshalFrom(params,
-					new TypeReference<McpSchema.PaginatedRequest>() {
-					});
+			// TODO: Implement pagination
+			// McpSchema.PaginatedRequest request = transport.unmarshalFrom(params,
+			// new TypeReference<McpSchema.PaginatedRequest>() {
+			// });
 
 			var promptList = this.prompts.values().stream().map(PromptRegistration::propmpt).toList();
 
