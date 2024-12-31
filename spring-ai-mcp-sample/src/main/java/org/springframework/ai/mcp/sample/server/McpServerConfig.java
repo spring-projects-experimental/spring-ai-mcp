@@ -135,7 +135,7 @@ public class McpServerConfig {
 						.loggingNotification(LoggingMessageNotification.builder()
 							.data("This is a log message from the weather tool")
 							.build())
-						.block();
+						.subscribe();
 
 					String city = (String) arguments.get("city");
 					TextContent content = new TextContent("Weather forecast for " + city + " is sunny");
