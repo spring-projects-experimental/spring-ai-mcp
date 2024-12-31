@@ -249,7 +249,12 @@ public class McpAsyncServer {
 				return toolRegistration.tool();
 			}).toList();
 
-			logger.info("Client tools list request - Cursor: {}", request.cursor());
+			String cursorInfo = Optional.ofNullable(request)
+				.map(McpSchema.PaginatedRequest::cursor)
+				.map(cursor -> "Cursor: " + cursor)
+				.orElse("No request");
+
+			logger.info("Client tools list request - {}", cursorInfo);
 			return Mono.just(new McpSchema.ListToolsResult(tools, null));
 		};
 	}
