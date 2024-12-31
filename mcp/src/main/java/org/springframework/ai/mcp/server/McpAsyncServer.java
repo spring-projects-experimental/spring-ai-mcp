@@ -79,6 +79,7 @@ public class McpAsyncServer {
 
 	private LoggingLevel minLoggingLevel = LoggingLevel.DEBUG;
 
+	// TODO: Add support for roots list changed notification
 	/**
 	 * Create a new McpAsyncServer with the given transport and capabilities.
 	 * @param mcpTransport The transport layer implementation for MCP communication
@@ -113,42 +114,42 @@ public class McpAsyncServer {
 		Map<String, DefaultMcpSession.RequestHandler> requestHandlers = new HashMap<>();
 
 		// Initialize request handlers for standard MCP methods
-		requestHandlers.put("initialize", initializeRequestHandler());
+		requestHandlers.put(McpSchema.METHOD_INITIALIZE, initializeRequestHandler());
 
 		// Ping MUST respond with an empty data, but not NULL response.
-		requestHandlers.put("ping", (params) -> Mono.<Object>just(""));
+		requestHandlers.put(McpSchema.METHOD_PING, (params) -> Mono.<Object>just(""));
 
 		// Add tools API handlers if the tool capability is enabled
 		if (this.serverCapabilities.tools() != null) {
-			requestHandlers.put("tools/list", toolsListRequestHandler());
-			requestHandlers.put("tools/call", toolsCallRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_TOOLS_LIST, toolsListRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_TOOLS_CALL, toolsCallRequestHandler());
 		}
 
 		// Add resources API handlers if provided
 		if (!Utils.isEmpty(this.resources)) {
-			requestHandlers.put("resources/list", resourcesListRequestHandler());
-			requestHandlers.put("resources/read", resourcesReadRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_RESOURCES_LIST, resourcesListRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_RESOURCES_READ, resourcesReadRequestHandler());
 		}
 
 		// Add resource templates API handlers if provided.
 		if (!Utils.isEmpty(this.resourceTemplates)) {
-			requestHandlers.put("resources/templates/list", resourceTemplateListRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_RESOURCES_TEMPLATES_LIST, resourceTemplateListRequestHandler());
 		}
 
 		// Add prompts API handlers if provider exists
 		if (!Utils.isEmpty(this.prompts)) {
-			requestHandlers.put("prompts/list", promptsListRequestHandler());
-			requestHandlers.put("prompts/get", promptsGetRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_PROMPT_LIST, promptsListRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_PROMPT_GET, promptsGetRequestHandler());
 		}
 
 		// Add logging API handlers if the logging capability is enabled
 		if (this.serverCapabilities.logging() != null) {
-			requestHandlers.put("logging/setLevel", setLoggerRequestHandler());
+			requestHandlers.put(McpSchema.METHOD_LOGGING_SET_LEVEL, setLoggerRequestHandler());
 		}
 
 		Map<String, NotificationHandler> notificationHandlers = new HashMap<>();
 
-		notificationHandlers.put("notifications/initialized", (params) -> Mono.empty());
+		notificationHandlers.put(McpSchema.METHOD_NOTIFICATION_INITIALIZED, (params) -> Mono.empty());
 
 		this.transport = mcpTransport;
 		this.mcpSession = new DefaultMcpSession(Duration.ofSeconds(10), mcpTransport, requestHandlers,
@@ -262,7 +263,7 @@ public class McpAsyncServer {
 	 * @return A Mono that completes when all clients have been notified
 	 */
 	public Mono<Void> notifyToolsListChanged() {
-		return this.mcpSession.sendNotification("notifications/tools/list_changed", null);
+		return this.mcpSession.sendNotification(McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null);
 	}
 
 	private DefaultMcpSession.RequestHandler toolsListRequestHandler() {
@@ -360,7 +361,7 @@ public class McpAsyncServer {
 	 * @return A Mono that completes when all clients have been notified
 	 */
 	public Mono<Void> notifyResourcesListChanged() {
-		return this.mcpSession.sendNotification("notifications/resources/list_changed", null);
+		return this.mcpSession.sendNotification(McpSchema.METHOD_NOTIFICATION_RESOURCES_LIST_CHANGED, null);
 	}
 
 	private DefaultMcpSession.RequestHandler resourcesListRequestHandler() {
@@ -454,7 +455,7 @@ public class McpAsyncServer {
 	 * @return A Mono that completes when all clients have been notified
 	 */
 	public Mono<Void> notifyPromptsListChanged() {
-		return this.mcpSession.sendNotification("notifications/prompts/list_changed", null);
+		return this.mcpSession.sendNotification(McpSchema.METHOD_NOTIFICATION_PROMPTS_LIST_CHANGED, null);
 	}
 
 	private DefaultMcpSession.RequestHandler promptsListRequestHandler() {
@@ -508,7 +509,7 @@ public class McpAsyncServer {
 			return Mono.empty();
 		}
 
-		return this.mcpSession.sendNotification("notifications/message", params);
+		return this.mcpSession.sendNotification(McpSchema.METHOD_NOTIFICATION_MESSAGE, params);
 	}
 
 	/**

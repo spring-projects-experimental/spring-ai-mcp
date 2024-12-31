@@ -136,12 +136,12 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Simulate server sending tools/list_changed notification
 		McpSchema.JSONRPCNotification notification = new McpSchema.JSONRPCNotification(McpSchema.JSONRPC_VERSION,
-				"notifications/tools/list_changed", null);
+				McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null);
 		transport.simulateIncomingMessage(notification);
 
 		// Simulate server response to tools/list request
 		McpSchema.JSONRPCRequest toolsListRequest = transport.getLastSentMessageAsRequest();
-		assertThat(toolsListRequest.method()).isEqualTo("tools/list");
+		assertThat(toolsListRequest.method()).isEqualTo(McpSchema.METHOD_TOOLS_LIST);
 
 		McpSchema.JSONRPCResponse toolsListResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION,
 				toolsListRequest.id(), mockToolsResult, null);
@@ -166,8 +166,8 @@ class McpAsyncClientResponseHandlerTests {
 			.async();
 
 		// Simulate incoming request
-		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION, "roots/list",
-				"test-id", null);
+		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION,
+				McpSchema.METHOD_ROOTS_LIST, "test-id", null);
 		transport.simulateIncomingMessage(request);
 
 		// Verify response
@@ -207,12 +207,12 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Simulate server sending resources/list_changed notification
 		McpSchema.JSONRPCNotification notification = new McpSchema.JSONRPCNotification(McpSchema.JSONRPC_VERSION,
-				"notifications/resources/list_changed", null);
+				McpSchema.METHOD_NOTIFICATION_RESOURCES_LIST_CHANGED, null);
 		transport.simulateIncomingMessage(notification);
 
 		// Simulate server response to resources/list request
 		McpSchema.JSONRPCRequest resourcesListRequest = transport.getLastSentMessageAsRequest();
-		assertThat(resourcesListRequest.method()).isEqualTo("resources/list");
+		assertThat(resourcesListRequest.method()).isEqualTo(McpSchema.METHOD_RESOURCES_LIST);
 
 		McpSchema.JSONRPCResponse resourcesListResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION,
 				resourcesListRequest.id(), mockResourcesResult, null);
@@ -251,12 +251,12 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Simulate server sending prompts/list_changed notification
 		McpSchema.JSONRPCNotification notification = new McpSchema.JSONRPCNotification(McpSchema.JSONRPC_VERSION,
-				"notifications/prompts/list_changed", null);
+				McpSchema.METHOD_NOTIFICATION_PROMPTS_LIST_CHANGED, null);
 		transport.simulateIncomingMessage(notification);
 
 		// Simulate server response to prompts/list request
 		McpSchema.JSONRPCRequest promptsListRequest = transport.getLastSentMessageAsRequest();
-		assertThat(promptsListRequest.method()).isEqualTo("prompts/list");
+		assertThat(promptsListRequest.method()).isEqualTo(McpSchema.METHOD_PROMPT_LIST);
 
 		McpSchema.JSONRPCResponse promptsListResponse = new McpSchema.JSONRPCResponse(McpSchema.JSONRPC_VERSION,
 				promptsListRequest.id(), mockPromptsResult, null);
@@ -303,7 +303,7 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Simulate incoming request
 		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION,
-				"sampling/createMessage", "test-id", messageRequest);
+				McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, "test-id", messageRequest);
 		transport.simulateIncomingMessage(request);
 
 		// Verify response
@@ -342,7 +342,7 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Simulate incoming request
 		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION,
-				"sampling/createMessage", "test-id", messageRequest);
+				McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, "test-id", messageRequest);
 		transport.simulateIncomingMessage(request);
 
 		// Verify error response
@@ -374,7 +374,7 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Simulate incoming request
 		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION,
-				"sampling/createMessage", "test-id", messageRequest);
+				McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, "test-id", messageRequest);
 		transport.simulateIncomingMessage(request);
 
 		// Verify error response
