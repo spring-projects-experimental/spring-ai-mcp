@@ -25,11 +25,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
-import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.server.McpServer.PromptRegistration;
 import org.springframework.ai.mcp.server.McpServer.ResourceRegistration;
 import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
 import org.springframework.ai.mcp.spec.McpError;
+import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptResult;
 import org.springframework.ai.mcp.spec.McpSchema.Prompt;

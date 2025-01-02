@@ -18,15 +18,14 @@ package org.springframework.ai.mcp.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Timeout;
-
-import org.springframework.http.server.reactive.HttpHandler;
-import org.springframework.http.server.reactive.ReactorHttpHandlerAdapter;
-import org.springframework.web.reactive.function.server.RouterFunctions;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
 import org.springframework.ai.mcp.server.transport.SseServerTransport;
 import org.springframework.ai.mcp.spec.McpTransport;
+import org.springframework.http.server.reactive.HttpHandler;
+import org.springframework.http.server.reactive.ReactorHttpHandlerAdapter;
+import org.springframework.web.reactive.function.server.RouterFunctions;
 
 /**
  * Tests for {@link McpSyncServer} using {@link SseServerTransport}.

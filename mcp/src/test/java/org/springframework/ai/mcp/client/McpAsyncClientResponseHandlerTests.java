@@ -20,99 +20,21 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 
+import org.springframework.ai.mcp.MockMcpTransport;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.ClientCapabilities;
-import org.springframework.ai.mcp.spec.McpSchema.JSONRPCNotification;
-import org.springframework.ai.mcp.spec.McpSchema.JSONRPCRequest;
 import org.springframework.ai.mcp.spec.McpSchema.Root;
-import org.springframework.ai.mcp.spec.McpTransport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 class McpAsyncClientResponseHandlerTests {
-
-	@SuppressWarnings("unused")
-	private static class MockMcpTransport implements McpTransport {
-
-		private final AtomicInteger inboundMessageCount = new AtomicInteger(0);
-
-		private final Sinks.Many<McpSchema.JSONRPCMessage> outgoing = Sinks.many().multicast().onBackpressureBuffer();
-
-		private final Sinks.Many<McpSchema.JSONRPCMessage> inbound = Sinks.many().unicast().onBackpressureBuffer();
-
-		private final Flux<McpSchema.JSONRPCMessage> outboundView = outgoing.asFlux().cache(1);
-
-		public void simulateIncomingMessage(McpSchema.JSONRPCMessage message) {
-			if (inbound.tryEmitNext(message).isFailure()) {
-				throw new RuntimeException("Failed to emit message " + message);
-			}
-			inboundMessageCount.incrementAndGet();
-		}
-
-		@Override
-		public Mono<Void> sendMessage(McpSchema.JSONRPCMessage message) {
-			if (outgoing.tryEmitNext(message).isFailure()) {
-				return Mono.error(new RuntimeException("Can't emit outgoing message " + message));
-			}
-			return Mono.empty();
-		}
-
-		public McpSchema.JSONRPCRequest getLastSentMessageAsRequest() {
-			return (JSONRPCRequest) outboundView.blockFirst();
-		}
-
-		public McpSchema.JSONRPCNotification getLastSentMessageAsNotifiation() {
-			return (JSONRPCNotification) outboundView.blockFirst();
-		}
-
-		public McpSchema.JSONRPCMessage getLastSentMessage() {
-			return outboundView.blockFirst();
-		}
-
-		private volatile boolean connected = false;
-
-		@Override
-		public Mono<Void> connect(Function<Mono<McpSchema.JSONRPCMessage>, Mono<McpSchema.JSONRPCMessage>> handler) {
-			if (connected) {
-				return Mono.error(new IllegalStateException("Already connected"));
-			}
-			connected = true;
-			return inbound.asFlux()
-				.publishOn(Schedulers.boundedElastic())
-				.flatMap(message -> Mono.just(message).transform(handler))
-				.doFinally(signal -> connected = false)
-				.then();
-		}
-
-		@Override
-		public Mono<Void> closeGracefully() {
-			return Mono.defer(() -> {
-				connected = false;
-				outgoing.tryEmitComplete();
-				inbound.tryEmitComplete();
-				return Mono.empty();
-			});
-		}
-
-		@Override
-		public <T> T unmarshalFrom(Object data, TypeReference<T> typeRef) {
-			return new ObjectMapper().convertValue(data, typeRef);
-		}
-
-	}
 
 	@Test
 	void testToolsChangeNotificationHandling() {

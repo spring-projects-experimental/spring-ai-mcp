@@ -178,4 +178,27 @@ public class McpSyncServer {
 		return this.asyncServer;
 	}
 
+	/**
+	 * Create a new message using the sampling capabilities of the client. The Model
+	 * Context Protocol (MCP) provides a standardized way for servers to request LLM
+	 * sampling (“completions” or “generations”) from language models via clients. This
+	 * flow allows clients to maintain control over model access, selection, and
+	 * permissions while enabling servers to leverage AI capabilities—with no server API
+	 * keys necessary. Servers can request text or image-based interactions and optionally
+	 * include context from MCP servers in their prompts.
+	 * @param createMessageRequest The request to create a new message
+	 * @return A Mono that completes when the message has been created
+	 * @throws McpError if the client has not been initialized or does not support
+	 * sampling capabilities
+	 * @throws McpError if the client does not support the createMessage method
+	 * @see McpSchema.CreateMessageRequest
+	 * @see McpSchema.CreateMessageResult
+	 * @see <a href=
+	 * "https://spec.modelcontextprotocol.io/specification/client/sampling/">Sampling
+	 * Specification</a>
+	 */
+	public McpSchema.CreateMessageResult createMessage(McpSchema.CreateMessageRequest createMessageRequest) {
+		return this.asyncServer.createMessage(createMessageRequest).block();
+	}
+
 }
