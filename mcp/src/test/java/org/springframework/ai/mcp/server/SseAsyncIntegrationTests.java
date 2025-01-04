@@ -31,17 +31,22 @@ import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.client.McpClient;
 import org.springframework.ai.mcp.client.transport.SseClientTransport;
+import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
 import org.springframework.ai.mcp.server.transport.SseServerTransport;
 import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
+import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
 import org.springframework.ai.mcp.spec.McpSchema.ClientCapabilities;
 import org.springframework.ai.mcp.spec.McpSchema.CreateMessageRequest;
 import org.springframework.ai.mcp.spec.McpSchema.CreateMessageResult;
 import org.springframework.ai.mcp.spec.McpSchema.InitializeResult;
 import org.springframework.ai.mcp.spec.McpSchema.Role;
 import org.springframework.ai.mcp.spec.McpSchema.Root;
+import org.springframework.ai.mcp.spec.McpSchema.ServerCapabilities;
+import org.springframework.ai.mcp.spec.McpSchema.Tool;
 import org.springframework.http.server.reactive.HttpHandler;
 import org.springframework.http.server.reactive.ReactorHttpHandlerAdapter;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.server.RouterFunctions;
 
@@ -312,6 +317,113 @@ public class SseAsyncIntegrationTests {
 
 		// Verify client can handle server closure gracefully
 		mcpClient.close();
+	}
+
+	// ---------------------------------------
+	// Tools Tests
+	// ---------------------------------------
+	@Test
+	void testToolCallSuccess() {
+
+		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
+		ToolRegistration tool1 = new ToolRegistration(
+				new McpSchema.Tool("tool1", "tool1 description", Map.of("city", "String")), request -> {
+					// perform a blocking call to a remote service
+					String response = RestClient.create()
+						.get()
+						.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
+						.retrieve()
+						.body(String.class);
+					assertThat(response).isNotBlank();
+					return callResponse;
+				});
+
+		var mcpServer = McpServer.using(mcpServerTransport)
+			.capabilities(ServerCapabilities.builder().tools(true).build())
+			.tools(tool1)
+			.sync();
+
+		var mcpClient = clientBuilder.sync();
+
+		InitializeResult initResult = mcpClient.initialize();
+		assertThat(initResult).isNotNull();
+
+		assertThat(mcpClient.listTools().tools()).contains(tool1.tool());
+
+		CallToolResult response = mcpClient.callTool(new McpSchema.CallToolRequest("tool1", Map.of()));
+
+		assertThat(response).isNotNull();
+		assertThat(response).isEqualTo(callResponse);
+
+		mcpClient.close();
+		mcpServer.close();
+	}
+
+	@Test
+	void testToolListChangeHandlingSuccess() {
+
+		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
+		ToolRegistration tool1 = new ToolRegistration(
+				new McpSchema.Tool("tool1", "tool1 description", Map.of("city", "String")), request -> {
+					// perform a blocking call to a remote service
+					String response = RestClient.create()
+						.get()
+						.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
+						.retrieve()
+						.body(String.class);
+					assertThat(response).isNotBlank();
+					return callResponse;
+				});
+
+		var mcpServer = McpServer.using(mcpServerTransport)
+			.capabilities(ServerCapabilities.builder().tools(true).build())
+			.tools(tool1)
+			.sync();
+
+		AtomicReference<List<Tool>> rootsRef = new AtomicReference<>();
+		var mcpClient = clientBuilder.toolsChangeConsumer(toolsUpdate -> {
+			// perform a blocking call to a remote service
+			String response = RestClient.create()
+				.get()
+				.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
+				.retrieve()
+				.body(String.class);
+			assertThat(response).isNotBlank();
+			rootsRef.set(toolsUpdate);
+		}).sync();
+
+		InitializeResult initResult = mcpClient.initialize();
+		assertThat(initResult).isNotNull();
+
+		assertThat(rootsRef.get()).isNull();
+
+		assertThat(mcpClient.listTools().tools()).contains(tool1.tool());
+
+		mcpServer.notifyToolsListChanged();
+
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			assertThat(rootsRef.get()).containsAll(List.of(tool1.tool()));
+		});
+
+		// Remove a tool
+		mcpServer.removeTool("tool1");
+
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			assertThat(rootsRef.get()).isEmpty();
+		});
+
+		// Add a new tool
+		ToolRegistration tool2 = new ToolRegistration(
+				new McpSchema.Tool("tool2", "tool2 description", Map.of("city", "String")), request -> callResponse);
+
+		mcpServer.addTool(tool2);
+
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			assertThat(rootsRef.get()).containsAll(List.of(tool2.tool()));
+		});
+
+		mcpClient.close();
+		mcpServer.close();
 	}
 
 }

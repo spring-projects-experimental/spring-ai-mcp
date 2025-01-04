@@ -28,7 +28,7 @@ public class ClientStdio {
 
 		var stdioParams = ServerParameters.builder("java")
 			.args("-Dtransport.mode=stdio", "-jar",
-					"spring-ai-mcp-sample/target/spring-ai-mcp-sample-0.4.0-SNAPSHOT.jar")
+					"spring-ai-mcp-sample/target/spring-ai-mcp-sample-0.5.0-SNAPSHOT.jar")
 			.build();
 
 		var transport = new StdioClientTransport(stdioParams);

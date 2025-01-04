@@ -28,7 +28,7 @@ The server can be started in two transport modes, controlled by the `transport.m
 ### Stdio Mode (Default)
 
 ```bash
-java -Dtransport.mode=stdio -jar target/spring-ai-mcp-sample-0.4.0-SNAPSHOT.jar
+java -Dtransport.mode=stdio -jar target/spring-ai-mcp-sample-0.5.0-SNAPSHOT.jar
 ```
 
 The Stdio mode server is automatically started by the client - no explicit server startup is needed.
@@ -38,7 +38,7 @@ In Stdio mode the server must not emit any messages/logs to the console (e.g. st
 
 ### SSE Mode
 ```bash
-java -Dtransport.mode=sse -jar target/spring-ai-mcp-sample-0.4.0-SNAPSHOT.jar
+java -Dtransport.mode=sse -jar target/spring-ai-mcp-sample-0.5.0-SNAPSHOT.jar
 ```
 
 ## Sample Clients
@@ -49,7 +49,7 @@ The project includes example clients for both transport modes:
 ```java
 var stdioParams = ServerParameters.builder("java")
     .args("-Dtransport.mode=stdio", "-jar",
-            "target/spring-ai-mcp-sample-0.4.0-SNAPSHOT.jar")
+            "target/spring-ai-mcp-sample-0.5.0-SNAPSHOT.jar")
     .build();
 
 var transport = new StdioClientTransport(stdioParams);

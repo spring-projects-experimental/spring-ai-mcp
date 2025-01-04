@@ -374,9 +374,9 @@ public class McpAsyncServer {
 				return Mono.<Object>error(new McpError("Tool not found: " + callToolRequest.name()));
 			}
 
-			CallToolResult callResponse = toolRegistration.get().call().apply(callToolRequest.arguments());
-
-			return Mono.just(callResponse);
+			return Mono.fromCallable(() -> toolRegistration.get().call().apply(callToolRequest.arguments()))
+				.map(result -> (Object) result)
+				.subscribeOn(Schedulers.boundedElastic());
 		};
 	}
 
@@ -462,7 +462,9 @@ public class McpAsyncServer {
 					});
 			var resourceUri = resourceRequest.uri();
 			if (this.resources.containsKey(resourceUri)) {
-				return Mono.just(this.resources.get(resourceUri).readHandler().apply(resourceRequest));
+				return Mono.fromCallable(() -> this.resources.get(resourceUri).readHandler().apply(resourceRequest))
+					.map(result -> (Object) result)
+					.subscribeOn(Schedulers.boundedElastic());
 			}
 			return Mono.error(new McpError("Resource not found: " + resourceUri));
 		};
@@ -558,7 +560,10 @@ public class McpAsyncServer {
 
 			// Implement prompt retrieval logic here
 			if (this.prompts.containsKey(promptRequest.name())) {
-				return Mono.just(this.prompts.get(promptRequest.name()).promptHandler().apply(promptRequest));
+				return Mono
+					.fromCallable(() -> this.prompts.get(promptRequest.name()).promptHandler().apply(promptRequest))
+					.map(result -> (Object) result)
+					.subscribeOn(Schedulers.boundedElastic());
 			}
 
 			return Mono.error(new McpError("Prompt not found: " + promptRequest.name()));
