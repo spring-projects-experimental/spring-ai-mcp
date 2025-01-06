@@ -275,14 +275,14 @@ public class StdioClientTransport implements ClientMcpTransport {
 						JSONRPCMessage message = McpSchema.deserializeJsonRpcMessage(this.objectMapper, line);
 						if (!this.inboundSink.tryEmitNext(message).isSuccess()) {
 							if (!isClosing) {
-								logger.error("Failed to enqueue inbound message");
+								logger.error("Failed to enqueue inbound message: {}", message);
 							}
 							break;
 						}
 					}
 					catch (Exception e) {
 						if (!isClosing) {
-							logger.error("Error processing inbound message", e);
+							logger.error("Error processing inbound message for line: " + line, e);
 						}
 						break;
 					}

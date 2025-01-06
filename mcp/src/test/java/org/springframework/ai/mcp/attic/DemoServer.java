@@ -44,7 +44,7 @@ public class DemoServer {
 
 		var mcpServer = McpServer.using(transport)
 			.serverInfo("Weather Forecast", "1.0.0")
-			.tool(new McpSchema.Tool("weather", "Weather forecast tool by location", Map.of("city", "String")),
+			.tool(new McpSchema.Tool("weather", "Weather forecast tool by location", "{ \"type\": \"object\" }"),
 					(arguments) -> {
 						String city = (String) arguments.get("city");
 						return new CallToolResult(List.of(), false);

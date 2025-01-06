@@ -676,11 +676,11 @@ public class McpSchema {
 	public record Tool( // @formatter:off
 		@JsonProperty("name") String name,
 		@JsonProperty("description") String description,
-		@JsonProperty("inputSchema") Map<String, Object> inputSchema) {
+		@JsonProperty("inputSchema") String inputSchema) {
 	
-		public Tool(String name, String description, String schema) {
-			this(name, description, parseSchema(schema));
-		}
+		// public Tool(String name, String description, String schema) {
+		// 	this(name, description, parseSchema(schema));
+		// }
 			
 	} // @formatter:on
 
@@ -724,6 +724,18 @@ public class McpSchema {
 	// ---------------------------
 	// Sampling Interfaces
 	// ---------------------------
+	@JsonInclude(JsonInclude.Include.NON_ABSENT)
+	public record ModelPreferences(// @formatter:off
+		@JsonProperty("hints") List<ModelHint> hints, 
+		@JsonProperty("costPriority") Double costPriority, 
+		@JsonProperty("speedPriority") Double speedPriority,
+		@JsonProperty("intelligencePriority") Double intelligencePriority) {
+	} // @formatter:on
+
+	@JsonInclude(JsonInclude.Include.NON_ABSENT)
+	public record ModelHint(@JsonProperty("name") String name) {
+	}
+
 	@JsonInclude(JsonInclude.Include.NON_ABSENT)
 	public record SamplingMessage(// @formatter:off
 		@JsonProperty("role") Role role,
@@ -802,18 +814,6 @@ public class McpSchema {
 			}
 		}
 	}// @formatter:on
-
-	// ---------------------------
-	// Model Preferences
-	// ---------------------------
-	@JsonInclude(JsonInclude.Include.NON_ABSENT)
-	public record ModelPreferences(List<ModelHint> hints, Double costPriority, Double speedPriority,
-			Double intelligencePriority) {
-	}
-
-	@JsonInclude(JsonInclude.Include.NON_ABSENT)
-	public record ModelHint(String name) {
-	}
 
 	// ---------------------------
 	// Pagination Interfaces

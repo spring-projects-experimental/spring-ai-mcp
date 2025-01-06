@@ -20,7 +20,7 @@
     <dependencies>
         <dependency>
             <groupId>org.springframework.experimental</groupId>
-            <artifactId>mcp</artifactId>
+            <artifactId>spring-ai-mcp</artifactId>
             <version>${project.version}</version>
         </dependency>
 

@@ -58,6 +58,13 @@ public class SampleClient {
 			.callTool(new CallToolRequest("calculator", Map.of("operation", "multiply", "a", 2.0, "b", 3.0)));
 		System.out.println("Calculator Response = " + calcResponse);
 
+		CallToolResult paymentStatus = client.callTool(
+				new CallToolRequest("paymentTransactionStatus", Map.of("transactionId", "006", "accountName", "John")));
+		System.out.println("Payment Status Response = " + paymentStatus);
+
+		CallToolResult parks = client.callTool(new CallToolRequest("getParks", Map.of()));
+		System.out.println("Parks Response = " + parks);
+
 		// List and demonstrate resources
 		var resourcesList = client.listResources();
 		System.out.println("\nAvailable Resources = " + resourcesList);

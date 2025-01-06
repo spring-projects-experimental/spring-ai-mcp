@@ -23,7 +23,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.ai.mcp.MockMcpTransport;
@@ -39,7 +41,7 @@ import static org.awaitility.Awaitility.await;
 class McpAsyncClientResponseHandlerTests {
 
 	@Test
-	void testToolsChangeNotificationHandling() {
+	void testToolsChangeNotificationHandling() throws JsonProcessingException {
 		MockMcpTransport transport = new MockMcpTransport();
 
 		// Create a list to store received tools for verification
@@ -55,7 +57,8 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Create a mock tools list that the server will return
 		Map<String, Object> inputSchema = Map.of("type", "object", "properties", Map.of(), "required", List.of());
-		McpSchema.Tool mockTool = new McpSchema.Tool("test-tool", "Test Tool Description", inputSchema);
+		McpSchema.Tool mockTool = new McpSchema.Tool("test-tool", "Test Tool Description",
+				new ObjectMapper().writeValueAsString(inputSchema));
 		McpSchema.ListToolsResult mockToolsResult = new McpSchema.ListToolsResult(List.of(mockTool), null);
 
 		// Simulate server sending tools/list_changed notification

@@ -2,6 +2,7 @@ package org.springframework.ai.mcp.sample.server;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -21,10 +22,14 @@ import org.springframework.ai.mcp.spec.McpSchema.LoggingMessageNotification;
 import org.springframework.ai.mcp.spec.McpSchema.PromptMessage;
 import org.springframework.ai.mcp.spec.McpSchema.Role;
 import org.springframework.ai.mcp.spec.McpSchema.TextContent;
+import org.springframework.ai.mcp.spec.McpSchema.Tool;
 import org.springframework.ai.mcp.spec.ServerMcpTransport;
+import org.springframework.ai.mcp.spring.ToolHelper;
+import org.springframework.ai.model.function.FunctionCallback;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.server.RouterFunction;
 
 @Configuration
@@ -55,7 +60,7 @@ public class McpServerConfig {
 	}
 
 	@Bean
-	public McpAsyncServer mcpServer(ServerMcpTransport transport) { // @formatter:off
+	public McpAsyncServer mcpServer(ServerMcpTransport transport, ThemeParkService themeParkService) { // @formatter:off
 
 		// Configure server capabilities with resource support
 		var capabilities = McpSchema.ServerCapabilities.builder()
@@ -71,12 +76,59 @@ public class McpServerConfig {
 			.capabilities(capabilities)
 			.resources(systemInfoResourceRegistration())
 			.prompts(greetingPromptRegistration())
-			.tools(calculatorToolRegistration())
+			.tools(calculatorToolRegistration(),
+				ToolHelper.toToolRegistration(
+					FunctionCallback.builder()
+						.description("Get transaction payment status")
+						.method("paymentTransactionStatus",String.class, String.class)
+						.targetClass(McpServerConfig.class)
+					.build()),
+				ToolHelper.toToolRegistration(
+					FunctionCallback.builder()
+						.description("To upper case")
+						.function("toUpperCase", new Function<String, String>() {
+							@Override
+							public String apply(String s) {
+								return s.toUpperCase();
+							}
+						})
+						.inputType(String.class)						
+					.build()))
+			.tools(themeParkServiceToolRegistrations(themeParkService))
 			.async();
 		
 		server.addTool(weatherToolRegistration(server));
 		return server; // @formatter:on
 	} // @formatter:on
+
+	public static List<ToolRegistration> themeParkServiceToolRegistrations(ThemeParkService themeParkService) {
+
+		var getParks = FunctionCallback.builder()
+			.description("Get list of Parks")
+			.method("getParks")
+			.targetObject(themeParkService)
+			.build();
+
+		var getEntitySchedule = FunctionCallback.builder()
+			.description("Get Park's entity schedule")
+			.method("getEntitySchedule", String.class)
+			.targetObject(themeParkService)
+			.build();
+
+		var getEntityLive = FunctionCallback.builder()
+			.description("Get Park's entity live status")
+			.method("getEntityLive", String.class)
+			.targetObject(themeParkService)
+			.build();
+
+		var getEntityChildren = FunctionCallback.builder()
+			.description("Get Park's entity children")
+			.method("getEntityChildren", String.class)
+			.targetObject(themeParkService)
+			.build();
+
+		return ToolHelper.toToolRegistration(getParks, getEntitySchedule, getEntityLive, getEntityChildren);
+	}
 
 	private static ResourceRegistration systemInfoResourceRegistration() {
 
@@ -131,8 +183,7 @@ public class McpServerConfig {
 	}
 
 	private static ToolRegistration weatherToolRegistration(McpAsyncServer server) {
-		return new ToolRegistration(
-				new McpSchema.Tool("weather", "Weather forecast tool by location", Map.of("city", "String")),
+		return new ToolRegistration(new McpSchema.Tool("weather", "Weather forecast tool by location", ""),
 				(arguments) -> {
 					String city = (String) arguments.get("city");
 
@@ -208,6 +259,19 @@ public class McpServerConfig {
 					return new McpSchema.CallToolResult(
 							java.util.List.of(new McpSchema.TextContent(String.valueOf(result))), false);
 				});
+	}
+
+	public static String paymentTransactionStatus(String transactionId, String accountName) {
+		return "The status for " + transactionId + ", by " + accountName + " is PENDING";
+	}
+
+	public Function<String, String> toUpperCase() {
+		return String::toUpperCase;
+	}
+
+	@Bean
+	public ThemeParkService themeParkService() {
+		return new ThemeParkService(RestClient.builder());
 	}
 
 }
