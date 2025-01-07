@@ -322,20 +322,31 @@ public class SseAsyncIntegrationTests {
 	// ---------------------------------------
 	// Tools Tests
 	// ---------------------------------------
+
+	String emptyJsonSchema = """
+			{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {}
+			}
+			""";
+
 	@Test
+
 	void testToolCallSuccess() {
 
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
-		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", ""), request -> {
-			// perform a blocking call to a remote service
-			String response = RestClient.create()
-				.get()
-				.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
-				.retrieve()
-				.body(String.class);
-			assertThat(response).isNotBlank();
-			return callResponse;
-		});
+		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
+				request -> {
+					// perform a blocking call to a remote service
+					String response = RestClient.create()
+						.get()
+						.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
+						.retrieve()
+						.body(String.class);
+					assertThat(response).isNotBlank();
+					return callResponse;
+				});
 
 		var mcpServer = McpServer.using(mcpServerTransport)
 			.capabilities(ServerCapabilities.builder().tools(true).build())
@@ -362,16 +373,17 @@ public class SseAsyncIntegrationTests {
 	void testToolListChangeHandlingSuccess() {
 
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
-		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", ""), request -> {
-			// perform a blocking call to a remote service
-			String response = RestClient.create()
-				.get()
-				.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
-				.retrieve()
-				.body(String.class);
-			assertThat(response).isNotBlank();
-			return callResponse;
-		});
+		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
+				request -> {
+					// perform a blocking call to a remote service
+					String response = RestClient.create()
+						.get()
+						.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
+						.retrieve()
+						.body(String.class);
+					assertThat(response).isNotBlank();
+					return callResponse;
+				});
 
 		var mcpServer = McpServer.using(mcpServerTransport)
 			.capabilities(ServerCapabilities.builder().tools(true).build())
@@ -411,7 +423,7 @@ public class SseAsyncIntegrationTests {
 		});
 
 		// Add a new tool
-		ToolRegistration tool2 = new ToolRegistration(new McpSchema.Tool("tool2", "tool2 description", ""),
+		ToolRegistration tool2 = new ToolRegistration(new McpSchema.Tool("tool2", "tool2 description", emptyJsonSchema),
 				request -> callResponse);
 
 		mcpServer.addTool(tool2);

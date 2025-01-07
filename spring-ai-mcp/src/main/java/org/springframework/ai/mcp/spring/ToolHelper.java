@@ -97,10 +97,6 @@ public final class ToolHelper {
 		return new McpServer.ToolRegistration(tool, request -> {
 			try {
 				String callResult = functionCallback.call(ModelOptionsUtils.toJsonString(request));
-				if (callResult != null) { // TODO: Maybe this code should be part of the
-											// (Stdio) transport implementation?
-					callResult = callResult.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n");
-				}
 				return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(callResult)), false);
 			}
 			catch (Exception e) {

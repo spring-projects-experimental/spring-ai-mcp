@@ -107,10 +107,17 @@ public abstract class AbstractMcpAsyncServerTests {
 	// ---------------------------------------
 	// Tools Tests
 	// ---------------------------------------
+	String emptyJsonSchema = """
+			{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {}
+			}
+			""";
 
 	@Test
 	void testAddTool() {
-		Tool newTool = new McpSchema.Tool("new-tool", "New test tool", "");
+		Tool newTool = new McpSchema.Tool("new-tool", "New test tool", emptyJsonSchema);
 		var mcpAsyncServer = McpServer.using(createMcpTransport())
 			.serverInfo("test-server", "1.0.0")
 			.capabilities(ServerCapabilities.builder().tools(true).build())
@@ -125,7 +132,7 @@ public abstract class AbstractMcpAsyncServerTests {
 
 	@Test
 	void testAddDuplicateTool() {
-		Tool duplicateTool = new McpSchema.Tool(TEST_TOOL_NAME, "Duplicate tool", "");
+		Tool duplicateTool = new McpSchema.Tool(TEST_TOOL_NAME, "Duplicate tool", emptyJsonSchema);
 
 		var mcpAsyncServer = McpServer.using(createMcpTransport())
 			.serverInfo("test-server", "1.0.0")
@@ -146,7 +153,7 @@ public abstract class AbstractMcpAsyncServerTests {
 
 	@Test
 	void testRemoveTool() {
-		Tool too = new McpSchema.Tool(TEST_TOOL_NAME, "Duplicate tool", "");
+		Tool too = new McpSchema.Tool(TEST_TOOL_NAME, "Duplicate tool", emptyJsonSchema);
 
 		var mcpAsyncServer = McpServer.using(createMcpTransport())
 			.serverInfo("test-server", "1.0.0")
@@ -175,7 +182,7 @@ public abstract class AbstractMcpAsyncServerTests {
 
 	@Test
 	void testNotifyToolsListChanged() {
-		Tool too = new McpSchema.Tool(TEST_TOOL_NAME, "Duplicate tool", "");
+		Tool too = new McpSchema.Tool(TEST_TOOL_NAME, "Duplicate tool", emptyJsonSchema);
 
 		var mcpAsyncServer = McpServer.using(createMcpTransport())
 			.serverInfo("test-server", "1.0.0")

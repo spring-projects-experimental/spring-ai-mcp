@@ -38,7 +38,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * @author Christian Tzolov
  */
-public class McpSchema {
+public final class McpSchema {
+
+	private McpSchema() {
+	}
 
 	public static final String LATEST_PROTOCOL_VERSION = "2024-11-05";
 
@@ -94,6 +97,8 @@ public class McpSchema {
 
 	// Sampling Methods
 	public static final String METHOD_SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
+
+	private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	// ---------------------------
 	// JSON-RPC Error Codes
@@ -659,6 +664,15 @@ public class McpSchema {
 		@JsonProperty("nextCursor") String nextCursor) {
 	}// @formatter:on
 
+	@JsonInclude(JsonInclude.Include.NON_ABSENT)
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	record JsonSchema( // @formatter:off
+		@JsonProperty("type") String type, 
+		@JsonProperty("properties") Map<String, Object> properties, 
+		@JsonProperty("required") List<String> required,
+		@JsonProperty("additionalProperties") Boolean additionalProperties) {
+	} // @formatter:on
+
 	/**
 	 * Represents a tool that the server provides. Tools enable servers to expose
 	 * executable functionality to the system. Through these tools, you can interact with
@@ -676,17 +690,17 @@ public class McpSchema {
 	public record Tool( // @formatter:off
 		@JsonProperty("name") String name,
 		@JsonProperty("description") String description,
-		@JsonProperty("inputSchema") String inputSchema) {
+		@JsonProperty("inputSchema") JsonSchema inputSchema) {
 	
-		// public Tool(String name, String description, String schema) {
-		// 	this(name, description, parseSchema(schema));
-		// }
+		public Tool(String name, String description, String schema) {
+			this(name, description, parseSchema(schema));
+		}
 			
 	} // @formatter:on
 
-	public static Map<String, Object> parseSchema(String schema) {
+	public static JsonSchema parseSchema(String schema) {
 		try {
-			return new ObjectMapper().readValue(schema, MAP_TYPE_REF);
+			return OBJECT_MAPPER.readValue(schema, JsonSchema.class);
 		}
 		catch (IOException e) {
 			throw new IllegalArgumentException("Invalid schema: " + schema, e);
@@ -726,8 +740,8 @@ public class McpSchema {
 	// ---------------------------
 	@JsonInclude(JsonInclude.Include.NON_ABSENT)
 	public record ModelPreferences(// @formatter:off
-		@JsonProperty("hints") List<ModelHint> hints, 
-		@JsonProperty("costPriority") Double costPriority, 
+		@JsonProperty("hints") List<ModelHint> hints,
+		@JsonProperty("costPriority") Double costPriority,
 		@JsonProperty("speedPriority") Double speedPriority,
 		@JsonProperty("intelligencePriority") Double intelligencePriority) {
 	} // @formatter:on
