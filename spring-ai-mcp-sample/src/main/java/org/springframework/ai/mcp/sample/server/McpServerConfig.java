@@ -60,7 +60,7 @@ public class McpServerConfig {
 	}
 
 	@Bean
-	public McpAsyncServer mcpServer(ServerMcpTransport transport, ThemeParkService themeParkService) { // @formatter:off
+	public McpAsyncServer mcpServer(ServerMcpTransport transport, OpenLibrary openLibrary) { // @formatter:off
 
 		// Configure server capabilities with resource support
 		var capabilities = McpSchema.ServerCapabilities.builder()
@@ -94,40 +94,28 @@ public class McpServerConfig {
 						})
 						.inputType(String.class)						
 					.build()))
-			.tools(themeParkServiceToolRegistrations(themeParkService))
+			.tools(openLibraryToolRegistrations(openLibrary))
 			.async();
 		
 		server.addTool(weatherToolRegistration(server));
 		return server; // @formatter:on
 	} // @formatter:on
 
-	public static List<ToolRegistration> themeParkServiceToolRegistrations(ThemeParkService themeParkService) {
+	public static List<ToolRegistration> openLibraryToolRegistrations(OpenLibrary openLibrary) {
 
-		var getParks = FunctionCallback.builder()
-			.description("Get list of Parks")
-			.method("getParks")
-			.targetObject(themeParkService)
+		var books = FunctionCallback.builder()
+			.description("Get list of Books by title")
+			.method("getBooks", String.class)
+			.targetObject(openLibrary)
 			.build();
 
-		var getEntitySchedule = FunctionCallback.builder()
-			.description("Get Park's entity schedule")
-			.method("getEntitySchedule", String.class)
-			.targetObject(themeParkService)
+		var bookTitlesByAuthor = FunctionCallback.builder()
+			.description("Get book titles by author")
+			.method("getBookTitlesByAuthor", String.class)
+			.targetObject(openLibrary)
 			.build();
 
-		var getEntityLive = FunctionCallback.builder()
-			.description("Get Park's entity live status")
-			.method("getEntityLive", String.class)
-			.targetObject(themeParkService)
-			.build();
-
-		var getEntityChildren = FunctionCallback.builder()
-			.description("Get Park's entity children")
-			.method("getEntityChildren", String.class)
-			.targetObject(themeParkService)
-			.build();
-
-		return ToolHelper.toToolRegistration(getParks, getEntitySchedule, getEntityLive, getEntityChildren);
+		return ToolHelper.toToolRegistration(books, bookTitlesByAuthor);
 	}
 
 	private static ResourceRegistration systemInfoResourceRegistration() {
@@ -183,7 +171,14 @@ public class McpServerConfig {
 	}
 
 	private static ToolRegistration weatherToolRegistration(McpAsyncServer server) {
-		return new ToolRegistration(new McpSchema.Tool("weather", "Weather forecast tool by location", ""),
+		String emptyJsonSchema = """
+				{
+					"$schema": "http://json-schema.org/draft-07/schema#",
+					"type": "object",
+					"properties": {"city" : "string"}
+				}
+				""";
+		return new ToolRegistration(new McpSchema.Tool("weather", "Weather forecast tool by location", emptyJsonSchema),
 				(arguments) -> {
 					String city = (String) arguments.get("city");
 
@@ -270,8 +265,8 @@ public class McpServerConfig {
 	}
 
 	@Bean
-	public ThemeParkService themeParkService() {
-		return new ThemeParkService(RestClient.builder());
+	public OpenLibrary openLibrary() {
+		return new OpenLibrary(RestClient.builder());
 	}
 
 }

@@ -62,8 +62,8 @@ public class SampleClient {
 				new CallToolRequest("paymentTransactionStatus", Map.of("transactionId", "006", "accountName", "John")));
 		System.out.println("Payment Status Response = " + paymentStatus);
 
-		CallToolResult parks = client.callTool(new CallToolRequest("getParks", Map.of()));
-		System.out.println("Parks Response = " + parks);
+		CallToolResult parks = client.callTool(new CallToolRequest("getBooks", Map.of("title", "Spring Framework")));
+		System.out.println("Books Response = " + parks);
 
 		// List and demonstrate resources
 		var resourcesList = client.listResources();
