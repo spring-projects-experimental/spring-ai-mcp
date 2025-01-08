@@ -7,11 +7,12 @@
 		<groupId>org.springframework.experimental</groupId>
 		<artifactId>mcp-parent</artifactId>
 		<version>0.5.0-SNAPSHOT</version>
+		<relativePath>../../pom.xml</relativePath>
 	</parent>
-	<artifactId>mcp</artifactId>
+	<artifactId>mcp-webmvc-sse-transport</artifactId>
 	<packaging>jar</packaging>
-	<name>Java MCP SDK</name>
-	<description>Java SDK implementation of the Model Context Protocol, enabling seamless integration with language models and AI tools</description>
+	<name>Spring Web MVC implementation of the Java MCP SSE transport</name>
+	<description></description>
 	<url>https://github.com/spring-projects-experimental/spring-ai-mcp</url>
 
 	<scm>
@@ -21,37 +22,25 @@
 	</scm>
 
 	<dependencies>
-
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j-api.version}</version>
+			<groupId>org.springframework.experimental</groupId>
+			<artifactId>mcp</artifactId>
+			<version>0.5.0-SNAPSHOT</version>
 		</dependency>
 
 		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-			<version>${jackson.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>io.projectreactor</groupId>
-			<artifactId>reactor-core</artifactId>
+			<groupId>org.springframework.experimental</groupId>
+			<artifactId>mcp-test</artifactId>
+			<version>0.5.0-SNAPSHOT</version>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-webmvc</artifactId>
 			<version>${springframework.version}</version>
-			<scope>test</scope>
 		</dependency>
 
-
-		<dependency>
-			<groupId>io.projectreactor.netty</groupId>
-			<artifactId>reactor-netty-http</artifactId>
-			<scope>test</scope>
-		</dependency>
 
 		<!-- The Spring Context is required due to the reactor-netty connector being dependant on
 		the Spring Lifecycle, as discussed here:
@@ -89,11 +78,6 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>io.projectreactor</groupId>
-			<artifactId>reactor-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>junit-jupiter</artifactId>
 			<version>${testcontainers.version}</version>
@@ -111,6 +95,30 @@
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 			<version>${logback.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>io.projectreactor.netty</groupId>
+			<artifactId>reactor-netty-http</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.servlet</groupId>
+			<artifactId>jakarta.servlet-api</artifactId>
+			<version>5.0.0</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-core</artifactId>
+			<version>10.1.18</version>
 			<scope>test</scope>
 		</dependency>
 

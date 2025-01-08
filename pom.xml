@@ -66,7 +66,7 @@
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
 
-		<spring-ai.version>1.0.0-M4</spring-ai.version>
+		<spring-ai.version>1.0.0-M5</spring-ai.version>
 		<assert4j.version>3.26.3</assert4j.version>
 		<junit.version>5.10.2</junit.version>
 		<mockito.version>5.11.0</mockito.version>
@@ -103,6 +103,9 @@
 		<module>spring-ai-mcp</module>
 		<module>spring-ai-mcp-sample</module>
 		<module>mcp-docs</module>
+		<module>mcp-test</module>
+		<module>mcp-transport/mcp-webflux-sse-transport</module>
+		<module>mcp-transport/mcp-webmvc-sse-transport</module>
 	</modules>
 
 	<build>

@@ -21,11 +21,9 @@ import java.util.Map;
 
 import reactor.util.annotation.Nullable;
 
-import org.springframework.lang.Contract;
-
 /**
  * Miscellaneous utility methods.
- * 
+ *
  * @author Christian Tzolov
  */
 
@@ -52,7 +50,6 @@ public final class Utils {
 	 * @param collection the Collection to check
 	 * @return whether the given Collection is empty
 	 */
-	@Contract("null -> true")
 	public static boolean isEmpty(@Nullable Collection<?> collection) {
 		return (collection == null || collection.isEmpty());
 	}
@@ -63,7 +60,6 @@ public final class Utils {
 	 * @param map the Map to check
 	 * @return whether the given Map is empty
 	 */
-	@Contract("null -> true")
 	public static boolean isEmpty(@Nullable Map<?, ?> map) {
 		return (map == null || map.isEmpty());
 	}

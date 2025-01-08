@@ -20,6 +20,11 @@
     <dependencies>
         <dependency>
             <groupId>org.springframework.experimental</groupId>
+            <artifactId>mcp-webflux-sse-transport</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.experimental</groupId>
             <artifactId>spring-ai-mcp</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -29,6 +34,28 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
             <version>${spring-boot.version}</version>
         </dependency>
+        <!-- <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+            <version>${spring-boot.version}</version>
+        </dependency> -->
+
+        <!-- Jetty Server-->
+        <!-- <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>11.0.15</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+            <version>11.0.15</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>5.0.0</version>
+        </dependency> -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

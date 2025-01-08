@@ -15,17 +15,16 @@
 */
 package org.springframework.ai.mcp.sample.client;
 
-import org.springframework.ai.mcp.client.transport.WebFluxSseClientTransport;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.ai.mcp.client.transport.HttpClientSseClientTransport;
 
 /**
  * @author Christian Tzolov
  */
 
-public class ClientSse {
+public class ClientSse2 {
 
 	public static void main(String[] args) {
-		var transport = new WebFluxSseClientTransport(WebClient.builder().baseUrl("http://localhost:8080"));
+		var transport = new HttpClientSseClientTransport("http://localhost:8080");
 
 		new SampleClient(transport).run();
 	}

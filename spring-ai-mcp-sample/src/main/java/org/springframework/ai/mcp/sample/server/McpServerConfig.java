@@ -13,8 +13,8 @@ import org.springframework.ai.mcp.server.McpServer;
 import org.springframework.ai.mcp.server.McpServer.PromptRegistration;
 import org.springframework.ai.mcp.server.McpServer.ResourceRegistration;
 import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
-import org.springframework.ai.mcp.server.transport.SseServerTransport;
 import org.springframework.ai.mcp.server.transport.StdioServerTransport;
+import org.springframework.ai.mcp.server.transport.WebFluxSseServerTransport;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptResult;
@@ -22,7 +22,6 @@ import org.springframework.ai.mcp.spec.McpSchema.LoggingMessageNotification;
 import org.springframework.ai.mcp.spec.McpSchema.PromptMessage;
 import org.springframework.ai.mcp.spec.McpSchema.Role;
 import org.springframework.ai.mcp.spec.McpSchema.TextContent;
-import org.springframework.ai.mcp.spec.McpSchema.Tool;
 import org.springframework.ai.mcp.spec.ServerMcpTransport;
 import org.springframework.ai.mcp.spring.ToolHelper;
 import org.springframework.ai.model.function.FunctionCallback;
@@ -47,17 +46,54 @@ public class McpServerConfig {
 	// SSE transport
 	@Bean
 	@ConditionalOnProperty(prefix = "transport", name = "mode", havingValue = "sse")
-	public SseServerTransport sseServerTransport() {
-		return new SseServerTransport(new ObjectMapper(), "/mcp/message");
+	public WebFluxSseServerTransport sseServerTransport() {
+		return new WebFluxSseServerTransport(new ObjectMapper(), "/mcp/message");
 	}
 
 	// Router function for SSE transport used by Spring WebFlux to start an HTTP
 	// server.
 	@Bean
 	@ConditionalOnProperty(prefix = "transport", name = "mode", havingValue = "sse")
-	public RouterFunction<?> mcpRouterFunction(SseServerTransport transport) {
+	public RouterFunction<?> mcpRouterFunction(WebFluxSseServerTransport transport) {
 		return transport.getRouterFunction();
 	}
+
+	// SSE transport
+	// @Bean
+	// @ConditionalOnProperty(prefix = "transport", name = "mode", havingValue = "sse2")
+	// public HttpServletSseServerTransport sseServerTransport2() {
+	// var httpTransport = new HttpServletSseServerTransport(new ObjectMapper(),
+	// "/mcp/message");
+
+	// // Create and configure Jetty server
+	// Server server = new Server(8080);
+
+	// ServletContextHandler context = new
+	// ServletContextHandler(ServletContextHandler.SESSIONS);
+	// context.setContextPath("/");
+	// server.setHandler(context);
+
+	// // Add our SSE servlet
+	// context.addServlet(new ServletHolder(httpTransport), "/sse");
+
+	// // Start the server
+	// try {
+	// server.start();
+	// System.out.println("Server started on http://localhost:8080/sse");
+	// server.join();
+	// }
+	// catch (Exception e) {
+	// e.printStackTrace();
+	// try {
+	// server.stop();
+	// }
+	// catch (Exception e1) {
+	// e1.printStackTrace();
+	// }
+	// }
+
+	// return httpTransport;
+	// }
 
 	@Bean
 	public McpAsyncServer mcpServer(ServerMcpTransport transport, OpenLibrary openLibrary) { // @formatter:off
@@ -79,20 +115,20 @@ public class McpServerConfig {
 			.tools(calculatorToolRegistration(),
 				ToolHelper.toToolRegistration(
 					FunctionCallback.builder()
-						.description("Get transaction payment status")
 						.method("paymentTransactionStatus",String.class, String.class)
+						.description("Get transaction payment status")
 						.targetClass(McpServerConfig.class)
 					.build()),
 				ToolHelper.toToolRegistration(
 					FunctionCallback.builder()
-						.description("To upper case")
-						.function("toUpperCase", new Function<String, String>() {
-							@Override
-							public String apply(String s) {
-								return s.toUpperCase();
-							}
-						})
-						.inputType(String.class)						
+					.function("toUpperCase", new Function<String, String>() {
+						@Override
+						public String apply(String s) {
+							return s.toUpperCase();
+						}
+					})
+					.description("To upper case")
+					.inputType(String.class)						
 					.build()))
 			.tools(openLibraryToolRegistrations(openLibrary))
 			.async();
@@ -104,14 +140,14 @@ public class McpServerConfig {
 	public static List<ToolRegistration> openLibraryToolRegistrations(OpenLibrary openLibrary) {
 
 		var books = FunctionCallback.builder()
-			.description("Get list of Books by title")
 			.method("getBooks", String.class)
+			.description("Get list of Books by title")
 			.targetObject(openLibrary)
 			.build();
 
 		var bookTitlesByAuthor = FunctionCallback.builder()
-			.description("Get book titles by author")
 			.method("getBookTitlesByAuthor", String.class)
+			.description("Get book titles by author")
 			.targetObject(openLibrary)
 			.build();
 
