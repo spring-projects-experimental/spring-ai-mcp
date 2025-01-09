@@ -11,10 +11,14 @@ Java SDK implementation of the link:https://modelcontextprotocol.io/introduction
 ** link:https://spec.modelcontextprotocol.io/specification/2024-11-05/server/resources/[Resource] management with URI templates
 ** link:https://spec.modelcontextprotocol.io/specification/2024-11-05/client/roots/[Roots] list management and notifications
 ** link:https://spec.modelcontextprotocol.io/specification/2024-11-05/server/prompts/[Prompt] handling and management
-** link:https://spec.modelcontextprotocol.io/specification/2024-11-05/client/sampling/[Smampling] support for AI model interactions
+** link:https://spec.modelcontextprotocol.io/specification/2024-11-05/client/sampling/[Sampling] support for AI model interactions
 * Multiple transport implementations:
-** Stdio-based transport for process-based communication
-** SSE-based transport for HTTP streaming
+** Core transports:
+*** Stdio-based transport for process-based communication
+*** Java HttpClient-based SSE transport for HTTP streaming
+** Spring-based transports:
+*** WebFlux SSE transport for reactive HTTP streaming
+*** WebMVC SSE transport for servlet-based HTTP streaming
 
 === Dependencies
 
@@ -24,8 +28,7 @@ Add the following dependency to your Maven project:
 ======
 Maven::
 +
-The core MCP functionality, provides the `StdioClientTransport` and `StdioServerTransport` transports as well
-as the pure java based `HttpClientSseClientTransport`  trasnport.
+The core MCP functionality:
 +
 [source,xml]
 ----
@@ -36,21 +39,19 @@ as the pure java based `HttpClientSseClientTransport`  trasnport.
 </dependency>
 ----
 +
-Optionally, to provide the `WebFluxSeeClientTransport` and `WebFluxSeeServerTransport`,  you add the `mcp-webflux-sse-transport` dependency:
+For HTTP SSE transport implementations, add one of the following dependencies 
+(Note that you already have HTTP Client SSE client transport in the core module):
 +
 [source,xml]
 ----
+<!-- Spring WebFlux-based SSE client and server transport -->
 <dependency>
     <groupId>org.springframework.experimental</groupId>
     <artifactId>mcp-webflux-sse-transport</artifactId>
     <version>0.5.0-SNAPSHOT</version>
 </dependency>
-----
-+
-or to provide the `WebMvcSeeServerTransport`,  add the `mcp-webmvc-sse-transport` dependency:
-+
-[source,xml]
-----
+
+<!-- Spring WebMVC-based SSE server transport -->
 <dependency>
     <groupId>org.springframework.experimental</groupId>
     <artifactId>mcp-webmvc-sse-transport</artifactId>
@@ -60,32 +61,25 @@ or to provide the `WebMvcSeeServerTransport`,  add the `mcp-webmvc-sse-transport
 
 Gradle::
 +
-The core MCP functionality, provides the `StdioClientTransport` and `StdioServerTransport` transports as well
-as the pure java based `HttpClientSseClientTransport`  trasnport.
+The core MCP functionality:
 +
 [source,groovy]
 ----
 dependencies {
-  implementation 'org.springframework.experimental:mcp'
+    implementation 'org.springframework.experimental:mcp'
 }
 ----
 +
-Optionally, to provide the `WebFluxSeeClientTransport` and `WebFluxSeeServerTransport`,  you add the `mcp-webflux-sse-transport` dependency:
+For HTTP SSE transport implementations, add one of the following dependencies 
+(note that you already have HTTP Client SSE client transport in the core module):
 +
 [source,groovy]
 ----
-dependencies {
-  implementation 'org.springframework.experimental:mcp-webflux-sse-transport'
-}
-----
-+
-or to provide the `WebMvcSeeServerTransport`,  add the `mcp-webmvc-sse-transport` dependency:
-+
-[source,groovy]
-----
-dependencies {
-  implementation 'org.springframework.experimental:mcp-webmvc-sse-transport'
-}
+// Spring WebFlux-based SSE client and server transport
+implementation 'org.springframework.experimental:mcp-webflux-sse-transport'
+
+// Spring WebMVC-based SSE server transport
+implementation 'org.springframework.experimental:mcp-webmvc-sse-transport'
 ----
 ======
 
@@ -98,7 +92,9 @@ The SDK follows a layered architecture with clear separation of concerns:
 
 * *Client/Server Layer*: Both use McpSession for sync/async operations, with McpClient handling client-side protocol operations and McpServer managing server-side protocol operations.
 * *Session Layer (McpSession)*: Manages communication patterns and state using DefaultMcpSession implementation.
-* *Transport Layer (McpTransport)*: Handles JSON-RPC message serialization/deserialization via StdioTransport (stdin/stdout) and SseTransport (HTTP streaming).
+* *Transport Layer (McpTransport)*: Handles JSON-RPC message serialization/deserialization via:
+** StdioTransport (stdin/stdout) in the core module
+** HTTP SSE transports in dedicated transport modules (Java HttpClient, Spring WebFlux, Spring WebMVC)
 
 Following class diagram illustrates the layered architecture of the MCP SDK, showing the relationships between core interfaces (McpTransport, McpSession), their implementations, and the client/server components. It highlights how the transport layer connects to sessions, which in turn support both synchronous and asynchronous client/server implementations.
 
@@ -260,7 +256,8 @@ McpTransport transport = new StdioClientTransport(params);
 +
 SSE (HttpClient)::
 +
-Creates a framework agnostic (pure Java api) SSE client transport
+Creates a framework agnostic (pure Java API) SSE client transport.
+Included in the core `mcp` module.
 +
 [source,java]
 ----
@@ -269,6 +266,7 @@ McpTransport transport = new HttpClientSseClientTransport("http://your-mcp-serve
 +
 SSE (WebFlux)::
 +
+Creates WebFlux-based SSE client transport.
 Requires the `mcp-webflux-sse-transport` dependency.
 +
 [source,java]
@@ -462,49 +460,62 @@ StdioServerTransport transport = new StdioServerTransport(new ObjectMapper());
 +
 Provides bidirectional JSON-RPC message handling over standard input/output streams with non-blocking message processing, serialization/deserialization, and graceful shutdown support.
 
-SSE(WebFlux)::
+SSE (WebFlux)::
 +
-Creates WebFlux based SSE server transport.
+Creates WebFlux-based SSE server transport.
 Requires the `mcp-webflux-sse-transport` dependency.
 +
 [source,java]
 ----
-ObjectMapper mapper = new ObjectMapper();
-String messageEndpoint = "/mcp/message";
-WebFluxSseServerTransport transport = new WebFluxSseServerTransport(mapper, messageEndpoint);
-
-// Get router function for web server configuration
-RouterFunction<?> router = transport.getRouterFunction();
-----
-+
-Implements the MCP HTTP with SSE transport specification, providing concurrent client connections through SSE endpoints with message routing, session management, and graceful shutdown capabilities.
-
-SSE(WebMvc)::
-+
-Creates WebMvc based SSE server transport.
-Requires the `mcp-webmvc-sse-transport` dependency.
-+
-[source,java]
-----
-String MESSAGE_ENDPOINT = "/mcp/message";
-
 @Configuration
-@EnableWebMvc
-static class MyConfig {
-
+class McpConfig {
     @Bean
-    public WebMvcSseServerTransport webMvcSseServerTransport() {
-        return new WebMvcSseServerTransport(new ObjectMapper(), MESSAGE_ENDPOINT);
+    WebFluxSseServerTransport webFluxSseServerTransport(ObjectMapper mapper) {
+        return new WebFluxSseServerTransport(mapper, "/mcp/message");
     }
 
     @Bean
-    public RouterFunction<ServerResponse> routerFunction(WebMvcSseServerTransport transport) {
+    RouterFunction<?> mcpRouterFunction(WebFluxSseServerTransport transport) {
         return transport.getRouterFunction();
     }
 }
 ----
 +
-Implements the MCP HTTP with SSE transport specification, providing concurrent client connections through SSE endpoints with message routing, session management, and graceful shutdown capabilities.
+Implements the MCP HTTP with SSE transport specification, providing:
++
+* Reactive HTTP streaming with WebFlux
+* Concurrent client connections through SSE endpoints
+* Message routing and session management
+* Graceful shutdown capabilities
+
+SSE (WebMvc)::
++
+Creates WebMvc-based SSE server transport.
+Requires the `mcp-webmvc-sse-transport` dependency.
++
+[source,java]
+----
+@Configuration
+@EnableWebMvc
+class McpConfig {
+    @Bean
+    WebMvcSseServerTransport webMvcSseServerTransport(ObjectMapper mapper) {
+        return new WebMvcSseServerTransport(mapper, "/mcp/message");
+    }
+
+    @Bean
+    RouterFunction<ServerResponse> mcpRouterFunction(WebMvcSseServerTransport transport) {
+        return transport.getRouterFunction();
+    }
+}
+----
++
+Implements the MCP HTTP with SSE transport specification, providing:
++
+* Servlet-based HTTP streaming with Spring MVC
+* Concurrent client connections through SSE endpoints
+* Message routing and session management
+* Graceful shutdown capabilities
 
 ======
 
