@@ -16,6 +16,13 @@ Java implementation of the Model Context Protocol specification. It includes:
 * Synchronous and asynchronous link:https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/mcp/README.md#client-usage-examples[MCP Client] and link:https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/mcp/README.md#server-usage-examples[MCP Server] implementations
 * Standard MCP operations support (tool discovery, resource management, prompt handling, structured logging). Support for request and notification handling.
 * link:https://spec.modelcontextprotocol.io/specification/basic/transports/#stdio[Stdio] and link:https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse[SSE] transport implementations.
+Core module provides out-of-the-box support for Stdio transport and framework agnostic SSE client transport. Additional modules provide support for other transports like SSE based on WebFlux and WebMvc.
+
+==== WebFlux SSE Transport
+The link:https://github.com/spring-projects-experimental/spring-ai-mcp/tree/main/mcp-transport/mcp-webflux-sse-transport[mcp-webflux-see-transport] project provides WebFlux based implementation for the SSE client and server transports.
+
+==== WebMvc SSE Transport
+The link:https://github.com/spring-projects-experimental/spring-ai-mcp/tree/main/mcp-transport/mcp-webmvc-sse-transport[mcp-webmvc-see-transport] project provides WebMvc based implementation for the SSE server transports. You can use the universal `HttpClientSseClientTransport` for the client transport.
 
 === xref:spring-mcp.adoc[Spring AI MCP]
 
@@ -33,10 +40,10 @@ Add the following dependencies to your Maven project:
 [tabs]
 ======
 Maven::
+For core MCP functionality
 +
 [source,xml]
 ----
-<!-- For core MCP functionality -->
 <dependency>
     <groupId>org.springframework.experimental</groupId>
     <artifactId>mcp</artifactId>
@@ -44,9 +51,35 @@ Maven::
 </dependency>
 ----
 +
+It provides the `StdioClientTransport` and `StdioServerTransport` transports as well
+as the pure java based `HttpClientSseClientTransport`  trasnport.
++
+Optionally, to provide the `WebFluxSeeClientTransport` and `WebFluxSeeServerTransport`,  you add the `mcp-webflux-sse-transport` dependency:
++
 [source,xml]
 ----
-<!-- For Spring AI integration -->
+<dependency>
+    <groupId>org.springframework.experimental</groupId>
+    <artifactId>mcp-webflux-sse-transport</artifactId>
+    <version>0.5.0-SNAPSHOT</version>
+</dependency>
+----
++
+or to provide the `WebMvcSeeServerTransport`,  add the `mcp-webmvc-sse-transport` dependency:
++
+[source,xml]
+----
+<dependency>
+    <groupId>org.springframework.experimental</groupId>
+    <artifactId>mcp-webmvc-sse-transport</artifactId>
+    <version>0.5.0-SNAPSHOT</version>
+</dependency>
+----
++
+For Spring AI integration add the spring-ai-mcp
++
+[source,xml]
+----
 <dependency>
     <groupId>org.springframework.experimental</groupId>
     <artifactId>spring-ai-mcp</artifactId>
@@ -55,7 +88,7 @@ Maven::
 ----
 +
 This is a milestone release, not available on Maven Central. 
-Add this repository to your POM:
+Add the Srping milestone repository to your POM:
 +
 [source,xml]
 ----
@@ -63,7 +96,7 @@ Add this repository to your POM:
   <repository>
     <id>spring-milestones</id>
     <name>Spring Milestones</name>
-    <url>https://repo.spring.io/libs-milestone-local</url>
+    <url>https://repo.spring.io/milestone</url>
     <snapshots>
       <enabled>false</enabled>
     </snapshots>
@@ -76,17 +109,51 @@ Gradle::
 [source,groovy]
 ----
 dependencies {
-    implementation 'org.springframework.experimental:mcp'
+  implementation 'org.springframework.experimental:mcp'
 }
 ----
-Or for Spring AI integration:
++
+It provides the `StdioClientTransport` and `StdioServerTransport` transports as well
+as the pure java based `HttpClientSseClientTransport`  trasnport.
++
+Optionally, to provide the `WebFluxSeeClientTransport` and `WebFluxSeeServerTransport`,  you add the `mcp-webflux-sse-transport` dependency:
 +
 [source,groovy]
 ----
 dependencies {
-    implementation 'org.springframework.experimental:spring-ai-mcp'
+  implementation 'org.springframework.experimental:mcp-webflux-sse-transport'
 }
 ----
++
+or to provide the `WebMvcSeeServerTransport`,  add the `mcp-webmvc-sse-transport` dependency:
++
+[source,groovy]
+----
+dependencies {
+  implementation 'org.springframework.experimental:mcp-webmvc-sse-transport'
+}
+----
++
+For Spring AI integration:
++
+[source,groovy]
+----
+dependencies {
+  implementation 'org.springframework.experimental:spring-ai-mcp'
+}
+----
++
+This is a milestone release, not available on Maven Central. 
+Add the Spring milestone repository to your POM:
++
+[source,groovy]
+----
+repositories {
+    ...
+    maven { url 'https://repo.spring.io/milestone' }
+}
+----
+
 ======
 
 == Examples
@@ -97,7 +164,8 @@ Explore these MCP examples in the link:https://github.com/spring-projects/spring
 * link:https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/sqlite/chatbot[SQLite Chatbot] - Interactive chatbot with SQLite database interaction
 * link:https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/filesystem[Filesystem] - Enables LLM interaction with local filesystem folders and files
 * link:https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/brave[Brave] - Enables natural language interactions with Brave Search, allowing you to perform internet searches.
-* link:./spring-ai-mcp-sample/[Spring-ai-mcp-sample] - Showcases how to create and use MCP servers and clients with different transport modes and capabilities.
+* link:../samples/spring-ai-mcp-sample/[Spring-ai-mcp-sample] - Showcases how to create and use MCP servers and clients with different transport modes and capabilities.
+* link:https://github.com/habuma/spring-ai-examples/tree/main/spring-ai-mcp[Spring AI MCP Server and Client] - This example shows how to create an MCP server and client with Spring AI. The MCP server exposes 3 tools that leverage the `Theme Park API`.
 
 == Documentation
 

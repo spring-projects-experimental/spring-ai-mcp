@@ -100,12 +100,12 @@
 
 	<modules>
 		<module>mcp</module>
-		<module>spring-ai-mcp</module>
-		<module>spring-ai-mcp-sample</module>
-		<module>mcp-docs</module>
-		<module>mcp-test</module>
 		<module>mcp-transport/mcp-webflux-sse-transport</module>
 		<module>mcp-transport/mcp-webmvc-sse-transport</module>
+		<module>spring-ai-mcp</module>
+		<module>mcp-docs</module>
+		<module>mcp-test</module>
+		<module>samples/spring-ai-mcp-sample</module>
 	</modules>
 
 	<build>

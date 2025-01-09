@@ -149,15 +149,26 @@ class StdioClientTransport implements ClientMcpTransport {
   +Sinks.Many<String> getErrorSink()
 }
 
-class SseClientTransport implements ClientMcpTransport {
-}
-
 class StdioServerTransport implements ServerMcpTransport {
 }
 
-class SseServerTransport implements ServerMcpTransport {
+
+class HttpClientSseClientTransport implements ClientMcpTransport {  
+}
+
+
+class WebFluxSseClientTransport implements ClientMcpTransport {
+}
+
+
+class WebFluxSseServerTransport implements ServerMcpTransport {
   +RouterFunction<?> getRouterFunction()
 }
+
+class WebMvcSseServerTransport implements ServerMcpTransport {
+  +RouterFunction<?> getRouterFunction()
+}
+
 
 ' Schema and Error Classes
 class McpSchema {

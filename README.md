@@ -68,7 +68,7 @@ Explore these MCP examples in the [spring-ai-examples/model-context-protocol](ht
 - [SQLite Chatbot](https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/sqlite/chatbot) - Interactive chatbot with SQLite database interaction
 - [Filesystem](https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/filesystem) - Enables LLM interaction with local filesystem folders and files
 - [Brave](https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/brave) - Enables natural language interactions with Brave Search, allowing you to perform internet searches.
-- [Spring-ai-mcp-sample](./spring-ai-mcp-sample/) - Showcases how to create and use MCP servers and clients with different transport modes and capabilities.
+- [Spring-ai-mcp-sample](./samples/spring-ai-mcp-sample/) - Showcases how to create and use MCP servers and clients with different transport modes and capabilities.
 ## Documentation
 
 - [Java MCP SDK documentation](mcp/README.md)
