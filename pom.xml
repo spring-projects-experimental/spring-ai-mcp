@@ -96,6 +96,7 @@
 		<org.maven.antora-version>1.0.0-alpha.4</org.maven.antora-version>
 		<io.spring.maven.antora-version>0.0.4</io.spring.maven.antora-version>
 		<asciidoctorj-pdf.version>1.6.2</asciidoctorj-pdf.version>
+		<junit-jupiter.version>5.10.5</junit-jupiter.version>
 	</properties>
 
 	<modules>
@@ -105,6 +106,7 @@
 		<module>spring-ai-mcp</module>
 		<module>mcp-docs</module>
 		<module>mcp-test</module>
+		<!-- <module>samples/spring-ai-mcp-webmvc-sample</module> -->
 	</modules>
 
 	<build>

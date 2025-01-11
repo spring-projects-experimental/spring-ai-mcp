@@ -1,4 +1,28 @@
+/*
+ * Copyright 2024-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.springframework.ai.mcp.server.transport;
+
+import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,17 +35,10 @@ import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.ServerMcpTransport;
 import org.springframework.ai.mcp.util.Assert;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
-
-import java.io.IOException;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * Server-side implementation of the MCP HTTP with SSE transport specification using
@@ -105,9 +122,10 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 
 				sessions.values().forEach(session -> {
 					try {
-						session.messageSink.send(SseEmitter.event().name(MESSAGE_EVENT_TYPE).data(jsonText));
+						var event = new SSEEvent(session.id, MESSAGE_EVENT_TYPE, jsonText);
+						session.queue.put(event);
 					}
-					catch (IOException e) {
+					catch (Exception e) {
 						logger.error("Failed to send message to session {}: {}", session.id, e.getMessage());
 					}
 				});
@@ -118,39 +136,11 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 		});
 	}
 
-	@Override
-	public <T> T unmarshalFrom(Object data, TypeReference<T> typeRef) {
-		return this.objectMapper.convertValue(data, typeRef);
-	}
-
-	@Override
-	public Mono<Void> closeGracefully() {
-		return Mono.fromRunnable(() -> {
-			isClosing = true;
-			logger.debug("Initiating graceful shutdown with {} active sessions", sessions.size());
-
-			sessions.values().forEach(session -> {
-				String sessionId = session.id;
-				session.close();
-				sessions.remove(sessionId);
-			});
-
-			logger.info("Graceful shutdown completed");
-		});
-	}
-
-	/**
-	 * Get the router function for configuring the web server.
-	 */
-	public RouterFunction<ServerResponse> getRouterFunction() {
-		return this.routerFunction;
-	}
-
 	/**
 	 * Handles new SSE connection requests from clients.
 	 */
 	private ServerResponse handleSseConnection(ServerRequest request) {
-		if (isClosing) {
+		if (this.isClosing) {
 			return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body("Server is shutting down");
 		}
 
@@ -162,37 +152,36 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 
 		// Send initial endpoint event
 		try {
-			session.messageSink.send(SseEmitter.event().name(ENDPOINT_EVENT_TYPE).data(messageEndpoint));
+			session.queue.put(new SSEEvent(session.id, ENDPOINT_EVENT_TYPE, messageEndpoint));
+			return ServerResponse.sse(sseBuilder -> {
+				// new Thread(() -> {
+				while (!this.isClosing) {
+					try {
+						SSEEvent sseEvent = session.queue.poll(100, TimeUnit.MILLISECONDS);
+						if (sseEvent != null) {
+							sseBuilder.id(sseEvent.id).event(sseEvent.type()).data(sseEvent.data());
+						}
+					}
+					catch (Exception e) {
+						logger.error("Failed to poll event from session queue: {}", e.getMessage());
+						sseBuilder.error(e);
+					}
+				}
+				// }).start();
+			});
 		}
-		catch (IOException e) {
+		catch (Exception e) {
 			logger.error("Failed to send initial endpoint event to session {}: {}", sessionId, e.getMessage());
 			sessions.remove(sessionId);
 			return ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
-
-		session.messageSink.onCompletion(() -> {
-			logger.debug("Session {} completed", sessionId);
-			sessions.remove(sessionId);
-		});
-
-		session.messageSink.onError(error -> {
-			logger.error("Error in session {}: {}", sessionId, error.getMessage());
-			sessions.remove(sessionId);
-		});
-
-		session.messageSink.onTimeout(() -> {
-			logger.debug("Session {} timed out", sessionId);
-			sessions.remove(sessionId);
-		});
-
-		return ServerResponse.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(session.messageSink);
 	}
 
 	/**
 	 * Handles incoming messages from clients.
 	 */
 	private ServerResponse handleMessage(ServerRequest request) {
-		if (isClosing) {
+		if (this.isClosing) {
 			return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body("Server is shutting down");
 		}
 
@@ -216,6 +205,9 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 		}
 	}
 
+	record SSEEvent(String id, String type, String data) {
+	}
+
 	/**
 	 * Represents an active client session.
 	 */
@@ -223,18 +215,18 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 
 		private final String id;
 
-		private final SseEmitter messageSink;
+		private final BlockingQueue<SSEEvent> queue;
 
 		ClientSession(String id) {
 			this.id = id;
-			this.messageSink = new SseEmitter(0L); // No timeout
+			this.queue = new LinkedBlockingQueue<>();
 			logger.debug("Session {} initialized with SSE emitter", id);
 		}
 
 		void close() {
 			logger.debug("Closing session: {}", id);
 			try {
-				messageSink.complete();
+				queue.remove();
 				logger.debug("Successfully completed SSE emitter for session {}", id);
 			}
 			catch (Exception e) {
@@ -242,6 +234,34 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 			}
 		}
 
+	}
+
+	@Override
+	public <T> T unmarshalFrom(Object data, TypeReference<T> typeRef) {
+		return this.objectMapper.convertValue(data, typeRef);
+	}
+
+	@Override
+	public Mono<Void> closeGracefully() {
+		return Mono.fromRunnable(() -> {
+			this.isClosing = true;
+			logger.debug("Initiating graceful shutdown with {} active sessions", sessions.size());
+
+			sessions.values().forEach(session -> {
+				String sessionId = session.id;
+				session.close();
+				sessions.remove(sessionId);
+			});
+
+			logger.info("Graceful shutdown completed");
+		});
+	}
+
+	/**
+	 * Get the router function for configuring the web server.
+	 */
+	public RouterFunction<ServerResponse> getRouterFunction() {
+		return this.routerFunction;
 	}
 
 }

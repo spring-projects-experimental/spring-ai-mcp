@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springframework.ai.mcp.server;
+package org.springframework.ai.mcp;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -25,12 +26,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.client.McpClient;
+import org.springframework.ai.mcp.client.transport.HttpClientSseClientTransport;
 import org.springframework.ai.mcp.client.transport.WebFluxSseClientTransport;
+import org.springframework.ai.mcp.server.McpServer;
 import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
 import org.springframework.ai.mcp.server.transport.WebFluxSseServerTransport;
 import org.springframework.ai.mcp.spec.McpError;
@@ -54,7 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-public class WebFluxSseAsyncIntegrationTests {
+public class WebFluxSseIntegrationTests {
 
 	private static final int PORT = 8182;
 
@@ -64,18 +69,21 @@ public class WebFluxSseAsyncIntegrationTests {
 
 	private WebFluxSseServerTransport mcpServerTransport;
 
-	McpClient.Builder clientBuilder;
+	ConcurrentHashMap<String, McpClient.Builder> clientBulders = new ConcurrentHashMap<>();
 
 	@BeforeEach
 	public void before() {
+
 		this.mcpServerTransport = new WebFluxSseServerTransport(new ObjectMapper(), MESSAGE_ENDPOINT);
 
 		HttpHandler httpHandler = RouterFunctions.toHttpHandler(mcpServerTransport.getRouterFunction());
 		ReactorHttpHandlerAdapter adapter = new ReactorHttpHandlerAdapter(httpHandler);
 		this.httpServer = HttpServer.create().port(PORT).handle(adapter).bindNow();
 
-		this.clientBuilder = McpClient
-			.using(new WebFluxSseClientTransport(WebClient.builder().baseUrl("http://localhost:" + PORT)));
+		clientBulders.put("httpclient", McpClient.using(new HttpClientSseClientTransport("http://localhost:" + PORT)));
+		clientBulders.put("webflux", McpClient
+			.using(new WebFluxSseClientTransport(WebClient.builder().baseUrl("http://localhost:" + PORT))));
+
 	}
 
 	@AfterEach
@@ -105,10 +113,13 @@ public class WebFluxSseAsyncIntegrationTests {
 		});
 	}
 
-	@Test
-	void testCreateMessageWithoutSamplingCapabilities() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testCreateMessageWithoutSamplingCapabilities(String clientType) {
 
 		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
+
+		var clientBuilder = clientBulders.get(clientType);
 
 		var client = clientBuilder.clientInfo(new McpSchema.Implementation("Sample client", "0.0.0")).sync();
 
@@ -128,8 +139,11 @@ public class WebFluxSseAsyncIntegrationTests {
 		});
 	}
 
-	@Test
-	void testCreateMessageSuccess() throws InterruptedException {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testCreateMessageSuccess(String clientType) throws InterruptedException {
+
+		var clientBuilder = clientBulders.get(clientType);
 
 		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
 
@@ -169,8 +183,11 @@ public class WebFluxSseAsyncIntegrationTests {
 	// ---------------------------------------
 	// Roots Tests
 	// ---------------------------------------
-	@Test
-	void testRootsSuccess() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testRootsSuccess(String clientType) {
+		var clientBuilder = clientBulders.get(clientType);
+
 		List<Root> roots = List.of(new Root("uri1://", "root1"), new Root("uri2://", "root2"));
 
 		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
@@ -214,8 +231,11 @@ public class WebFluxSseAsyncIntegrationTests {
 		mcpServer.close();
 	}
 
-	@Test
-	void testRootsWithoutCapability() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testRootsWithoutCapability(String clientType) {
+		var clientBuilder = clientBulders.get(clientType);
+
 		var mcpServer = McpServer.using(mcpServerTransport).rootsChangeConsumer(rootsUpdate -> {
 		}).sync();
 
@@ -236,8 +256,11 @@ public class WebFluxSseAsyncIntegrationTests {
 		mcpServer.close();
 	}
 
-	@Test
-	void testRootsWithEmptyRootsList() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testRootsWithEmptyRootsList(String clientType) {
+		var clientBuilder = clientBulders.get(clientType);
+
 		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
 		var mcpServer = McpServer.using(mcpServerTransport)
 			.rootsChangeConsumer(rootsUpdate -> rootsRef.set(rootsUpdate))
@@ -260,8 +283,11 @@ public class WebFluxSseAsyncIntegrationTests {
 		mcpServer.close();
 	}
 
-	@Test
-	void testRootsWithMultipleConsumers() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testRootsWithMultipleConsumers(String clientType) {
+		var clientBuilder = clientBulders.get(clientType);
+
 		List<Root> roots = List.of(new Root("uri1://", "root1"));
 
 		AtomicReference<List<Root>> rootsRef1 = new AtomicReference<>();
@@ -290,8 +316,12 @@ public class WebFluxSseAsyncIntegrationTests {
 		mcpServer.close();
 	}
 
-	@Test
-	void testRootsServerCloseWithActiveSubscription() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testRootsServerCloseWithActiveSubscription(String clientType) {
+
+		var clientBuilder = clientBulders.get(clientType);
+
 		List<Root> roots = List.of(new Root("uri1://", "root1"));
 
 		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
@@ -331,9 +361,11 @@ public class WebFluxSseAsyncIntegrationTests {
 			}
 			""";
 
-	@Test
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testToolCallSuccess(String clientType) {
 
-	void testToolCallSuccess() {
+		var clientBuilder = clientBulders.get(clientType);
 
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
 		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
@@ -369,8 +401,11 @@ public class WebFluxSseAsyncIntegrationTests {
 		mcpServer.close();
 	}
 
-	@Test
-	void testToolListChangeHandlingSuccess() {
+	@ParameterizedTest(name = "{0} : {displayName} ")
+	@ValueSource(strings = { "httpclient", "webflux" })
+	void testToolListChangeHandlingSuccess(String clientType) {
+
+		var clientBuilder = clientBulders.get(clientType);
 
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
 		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
