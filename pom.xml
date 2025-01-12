@@ -100,6 +100,7 @@
 	</properties>
 
 	<modules>
+		<module>mcp-bom</module>
 		<module>mcp</module>
 		<module>mcp-transport/mcp-webflux-sse-transport</module>
 		<module>mcp-transport/mcp-webmvc-sse-transport</module>

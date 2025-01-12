@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.experimental</groupId>
+        <artifactId>mcp-parent</artifactId>
+        <version>0.5.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mcp-bom</artifactId>
+    <packaging>pom</packaging>
+    <name>Spring AI MCP BOM</name>
+    <description>Spring AI MCP Bill of Materials</description>
+
+    <properties>
+        <main.basedir>${basedir}/..</main.basedir>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Core MCP -->
+            <dependency>
+                <groupId>org.springframework.experimental</groupId>
+                <artifactId>mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- MCP Test -->
+            <dependency>
+                <groupId>org.springframework.experimental</groupId>
+                <artifactId>mcp-test</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- MCP Transport - WebFlux SSE -->
+            <dependency>
+                <groupId>org.springframework.experimental</groupId>
+                <artifactId>mcp-webflux-sse-transport</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- MCP Transport - WebMVC SSE -->
+            <dependency>
+                <groupId>org.springframework.experimental</groupId>
+                <artifactId>mcp-webmvc-sse-transport</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Spring AI MCP -->
+            <dependency>
+                <groupId>org.springframework.experimental</groupId>
+                <artifactId>spring-ai-mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

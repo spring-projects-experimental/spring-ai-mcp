@@ -1,0 +1,109 @@
+[[dependency-management]]
+= Dependency Management
+
+[[mcp-bom]]
+== Bill of Materials (BOM)
+
+The Bill of Materials (BOM) declares the recommended versions of all the dependencies used by a given release.
+Using the BOM from your application’s build script avoids the need for you to specify and maintain the dependency versions yourself.
+Instead, the version of the BOM you’re using determines the utilized dependency versions.
+It also ensures that you’re using supported and tested versions of the dependencies by default, unless you choose to override them.
+
+Add the BOM to your project:
+
+[tabs]
+======
+Maven::
++
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.experimental</groupId>
+            <artifactId>mcp-bom</artifactId>
+            <version>0.5.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+----
+
+Gradle::
++
+[source,groovy,indent=0,subs="verbatim,quotes"]
+----
+dependencies {
+  implementation platform("org.springframework.experimental:mcp-bom:0.5.0-SNAPSHOT")
+  // Replace the following with the starter dependencies of specific modules you wish to use
+  //...
+}
+----
+Gradle users can also use the Spring AI MCP BOM by leveraging Gradle (5.0+) native support for declaring dependency constraints using a Maven BOM.
+This is implemented by adding a 'platform' dependency handler method to the dependencies section of your Gradle build script.
+As shown in the snippet below this can then be followed by version-less declarations of the Starter Dependencies for the one or more spring-ai modules you wish to use, e.g. spring-ai-openai.
+======
+
+[[dependencies]]
+== Available Dependencies
+
+The following dependencies are available and managed by the BOM:
+
+=== Core Dependencies
+
+* `org.springframework.experimental:mcp` - Core MCP library providing the base functionality and APIs for Model Context Protocol implementation.
+* `org.springframework.experimental:spring-ai-mcp` - Spring AI integration with MCP, providing Spring-specific features and utilities.
+
+=== Transport Dependencies
+
+* `org.springframework.experimental:mcp-webflux-sse-transport` - WebFlux-based Server-Sent Events (SSE) transport implementation for reactive applications.
+* `org.springframework.experimental:mcp-webmvc-sse-transport` - WebMVC-based Server-Sent Events (SSE) transport implementation for servlet-based applications.
+
+=== Testing Dependencies
+
+* `org.springframework.experimental:mcp-test` - Testing utilities and support for MCP-based applications.
+
+[[repositories]]
+=== Milestone and Snapshot Repositories
+
+To use the Milestone and Snapshot version, you need to add references to the Spring Milestone and/or Snapshot repositories in your build file.
+Add the following repository definitions to your Maven or Gradle build file:
+
+[tabs]
+======
+Maven::
++
+[source,xml,indent=0,subs="verbatim,quotes"]
+----
+  <repositories>
+    <repository>
+      <id>spring-milestones</id>
+      <name>Spring Milestones</name>
+      <url>https://repo.spring.io/milestone</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>spring-snapshots</id>
+      <name>Spring Snapshots</name>
+      <url>https://repo.spring.io/snapshot</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+    </repository>
+  </repositories>
+----
+
+Gradle::
++
+[source,groovy,indent=0,subs="verbatim,quotes"]
+----
+repositories {
+  mavenCentral()
+  maven { url 'https://repo.spring.io/milestone' }
+  maven { url 'https://repo.spring.io/snapshot' }
+}
+----
+======
