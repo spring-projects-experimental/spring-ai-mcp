@@ -153,6 +153,10 @@ class StdioServerTransport implements ServerMcpTransport {
 }
 
 
+class HttpServletSseServerTransport implements ServerMcpTransport {
+}
+
+
 class HttpClientSseClientTransport implements ClientMcpTransport {  
 }
 
