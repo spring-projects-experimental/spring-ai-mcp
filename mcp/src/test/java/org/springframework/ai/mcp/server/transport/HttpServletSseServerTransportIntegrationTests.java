@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springframework.ai.mcp.server;
+package org.springframework.ai.mcp.server.transport;
 
 import java.time.Duration;
 import java.util.List;
@@ -22,17 +22,21 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.catalina.Context;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.LifecycleState;
+import org.apache.catalina.startup.Tomcat;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import reactor.netty.DisposableServer;
-import reactor.netty.http.server.HttpServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.client.McpClient;
-import org.springframework.ai.mcp.client.transport.SseClientTransport;
+import org.springframework.ai.mcp.client.transport.HttpClientSseClientTransport;
+import org.springframework.ai.mcp.server.McpServer;
 import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
-import org.springframework.ai.mcp.server.transport.SseServerTransport;
 import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.CallToolResult;
@@ -44,50 +48,76 @@ import org.springframework.ai.mcp.spec.McpSchema.Role;
 import org.springframework.ai.mcp.spec.McpSchema.Root;
 import org.springframework.ai.mcp.spec.McpSchema.ServerCapabilities;
 import org.springframework.ai.mcp.spec.McpSchema.Tool;
-import org.springframework.http.server.reactive.HttpHandler;
-import org.springframework.http.server.reactive.ReactorHttpHandlerAdapter;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.server.RouterFunctions;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-public class SseAsyncIntegrationTests {
+public class HttpServletSseServerTransportIntegrationTests {
 
-	private static final int PORT = 8181;
+	private static final Logger logger = LoggerFactory.getLogger(HttpServletSseServerTransportIntegrationTests.class);
+
+	private static final int PORT = 8184;
 
 	private static final String MESSAGE_ENDPOINT = "/mcp/message";
 
-	private DisposableServer httpServer;
-
-	private SseServerTransport mcpServerTransport;
+	private HttpServletSseServerTransport mcpServerTransport;
 
 	McpClient.Builder clientBuilder;
 
+	private Tomcat tomcat;
+
 	@BeforeEach
 	public void before() {
-		this.mcpServerTransport = new SseServerTransport(new ObjectMapper(), MESSAGE_ENDPOINT);
+		tomcat = new Tomcat();
+		tomcat.setPort(PORT);
 
-		HttpHandler httpHandler = RouterFunctions.toHttpHandler(mcpServerTransport.getRouterFunction());
-		ReactorHttpHandlerAdapter adapter = new ReactorHttpHandlerAdapter(httpHandler);
-		this.httpServer = HttpServer.create().port(PORT).handle(adapter).bindNow();
+		String baseDir = System.getProperty("java.io.tmpdir");
+		tomcat.setBaseDir(baseDir);
 
-		this.clientBuilder = McpClient
-			.using(new SseClientTransport(WebClient.builder().baseUrl("http://localhost:" + PORT)));
+		Context context = tomcat.addContext("", baseDir);
+
+		// Create and configure the transport
+		mcpServerTransport = new HttpServletSseServerTransport(new ObjectMapper(), MESSAGE_ENDPOINT);
+
+		// Add transport servlet to Tomcat
+		org.apache.catalina.Wrapper wrapper = context.createWrapper();
+		wrapper.setName("mcpServlet");
+		wrapper.setServlet(mcpServerTransport);
+		wrapper.setLoadOnStartup(1);
+		wrapper.setAsyncSupported(true);
+		context.addChild(wrapper);
+		context.addServletMappingDecoded("/*", "mcpServlet");
+
+		try {
+			var connector = tomcat.getConnector();
+			connector.setAsyncTimeout(3000);
+			tomcat.start();
+			assertThat(tomcat.getServer().getState() == LifecycleState.STARTED);
+		}
+		catch (Exception e) {
+			throw new RuntimeException("Failed to start Tomcat", e);
+		}
+
+		this.clientBuilder = McpClient.using(new HttpClientSseClientTransport("http://localhost:" + PORT));
 	}
 
 	@AfterEach
 	public void after() {
-		if (httpServer != null) {
-			httpServer.disposeNow();
+		if (mcpServerTransport != null) {
+			mcpServerTransport.closeGracefully().block();
+		}
+		if (tomcat != null) {
+			try {
+				tomcat.stop();
+				tomcat.destroy();
+			}
+			catch (LifecycleException e) {
+				throw new RuntimeException("Failed to stop Tomcat", e);
+			}
 		}
 	}
 
-	// ---------------------------------------
-	// Sampling Tests
-	// ---------------------------------------
 	@Test
 	void testCreateMessageWithoutInitialization() {
 		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
@@ -107,7 +137,6 @@ public class SseAsyncIntegrationTests {
 
 	@Test
 	void testCreateMessageWithoutSamplingCapabilities() {
-
 		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
 
 		var client = clientBuilder.clientInfo(new McpSchema.Implementation("Sample client", "0.0.0")).sync();
@@ -129,8 +158,7 @@ public class SseAsyncIntegrationTests {
 	}
 
 	@Test
-	void testCreateMessageSuccess() throws InterruptedException {
-
+	void testCreateMessageSuccess() {
 		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
 
 		Function<CreateMessageRequest, CreateMessageResult> samplingHandler = request -> {
@@ -166,9 +194,6 @@ public class SseAsyncIntegrationTests {
 		}).verifyComplete();
 	}
 
-	// ---------------------------------------
-	// Roots Tests
-	// ---------------------------------------
 	@Test
 	void testRootsSuccess() {
 		List<Root> roots = List.of(new Root("uri1://", "root1"), new Root("uri2://", "root2"));
@@ -195,150 +220,23 @@ public class SseAsyncIntegrationTests {
 			assertThat(rootsRef.get()).containsAll(roots);
 		});
 
-		// Remove a root
-		mcpClient.removeRoot(roots.get(0).uri());
-
-		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).containsAll(List.of(roots.get(1)));
-		});
-
-		// Add a new root
-		var root3 = new Root("uri3://", "root3");
-		mcpClient.addRoot(root3);
-
-		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).containsAll(List.of(roots.get(1), root3));
-		});
-
 		mcpClient.close();
 		mcpServer.close();
 	}
-
-	@Test
-	void testRootsWithoutCapability() {
-		var mcpServer = McpServer.using(mcpServerTransport).rootsChangeConsumer(rootsUpdate -> {
-		}).sync();
-
-		// Create client without roots capability
-		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().build()) // No
-																							// roots
-																							// capability
-			.sync();
-
-		InitializeResult initResult = mcpClient.initialize();
-		assertThat(initResult).isNotNull();
-
-		// Attempt to list roots should fail
-		assertThatThrownBy(() -> mcpServer.listRoots().roots()).isInstanceOf(McpError.class)
-			.hasMessage("Roots not supported");
-
-		mcpClient.close();
-		mcpServer.close();
-	}
-
-	@Test
-	void testRootsWithEmptyRootsList() {
-		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
-		var mcpServer = McpServer.using(mcpServerTransport)
-			.rootsChangeConsumer(rootsUpdate -> rootsRef.set(rootsUpdate))
-			.sync();
-
-		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
-			.roots(List.of()) // Empty roots list
-			.sync();
-
-		InitializeResult initResult = mcpClient.initialize();
-		assertThat(initResult).isNotNull();
-
-		mcpClient.rootsListChangedNotification();
-
-		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).isEmpty();
-		});
-
-		mcpClient.close();
-		mcpServer.close();
-	}
-
-	@Test
-	void testRootsWithMultipleConsumers() {
-		List<Root> roots = List.of(new Root("uri1://", "root1"));
-
-		AtomicReference<List<Root>> rootsRef1 = new AtomicReference<>();
-		AtomicReference<List<Root>> rootsRef2 = new AtomicReference<>();
-
-		var mcpServer = McpServer.using(mcpServerTransport)
-			.rootsChangeConsumer(rootsUpdate -> rootsRef1.set(rootsUpdate))
-			.rootsChangeConsumer(rootsUpdate -> rootsRef2.set(rootsUpdate))
-			.sync();
-
-		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
-			.roots(roots)
-			.sync();
-
-		InitializeResult initResult = mcpClient.initialize();
-		assertThat(initResult).isNotNull();
-
-		mcpClient.rootsListChangedNotification();
-
-		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef1.get()).containsAll(roots);
-			assertThat(rootsRef2.get()).containsAll(roots);
-		});
-
-		mcpClient.close();
-		mcpServer.close();
-	}
-
-	@Test
-	void testRootsServerCloseWithActiveSubscription() {
-		List<Root> roots = List.of(new Root("uri1://", "root1"));
-
-		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
-		var mcpServer = McpServer.using(mcpServerTransport)
-			.rootsChangeConsumer(rootsUpdate -> rootsRef.set(rootsUpdate))
-			.sync();
-
-		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
-			.roots(roots)
-			.sync();
-
-		InitializeResult initResult = mcpClient.initialize();
-		assertThat(initResult).isNotNull();
-
-		mcpClient.rootsListChangedNotification();
-
-		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).containsAll(roots);
-		});
-
-		// Close server while subscription is active
-		mcpServer.close();
-
-		// Verify client can handle server closure gracefully
-		mcpClient.close();
-	}
-
-	// ---------------------------------------
-	// Tools Tests
-	// ---------------------------------------
 
 	String emptyJsonSchema = """
 			{
-				"$schema": "http://json-schema.org/draft-07/schema#",
-				"type": "object",
-				"properties": {}
+			    "$schema": "http://json-schema.org/draft-07/schema#",
+			    "type": "object",
+			    "properties": {}
 			}
 			""";
 
 	@Test
-
 	void testToolCallSuccess() {
-
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
 		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
 				request -> {
-					// perform a blocking call to a remote service
 					String response = RestClient.create()
 						.get()
 						.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
@@ -371,11 +269,9 @@ public class SseAsyncIntegrationTests {
 
 	@Test
 	void testToolListChangeHandlingSuccess() {
-
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
 		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
 				request -> {
-					// perform a blocking call to a remote service
 					String response = RestClient.create()
 						.get()
 						.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
@@ -390,47 +286,56 @@ public class SseAsyncIntegrationTests {
 			.tools(tool1)
 			.sync();
 
-		AtomicReference<List<Tool>> rootsRef = new AtomicReference<>();
+		AtomicReference<List<Tool>> toolsRef = new AtomicReference<>();
 		var mcpClient = clientBuilder.toolsChangeConsumer(toolsUpdate -> {
-			// perform a blocking call to a remote service
 			String response = RestClient.create()
 				.get()
 				.uri("https://github.com/spring-projects-experimental/spring-ai-mcp/blob/main/README.md")
 				.retrieve()
 				.body(String.class);
 			assertThat(response).isNotBlank();
-			rootsRef.set(toolsUpdate);
+			toolsRef.set(toolsUpdate);
 		}).sync();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
 
-		assertThat(rootsRef.get()).isNull();
+		assertThat(toolsRef.get()).isNull();
 
 		assertThat(mcpClient.listTools().tools()).contains(tool1.tool());
 
 		mcpServer.notifyToolsListChanged();
 
 		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).containsAll(List.of(tool1.tool()));
+			assertThat(toolsRef.get()).containsAll(List.of(tool1.tool()));
 		});
 
-		// Remove a tool
 		mcpServer.removeTool("tool1");
 
 		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).isEmpty();
+			assertThat(toolsRef.get()).isEmpty();
 		});
 
-		// Add a new tool
 		ToolRegistration tool2 = new ToolRegistration(new McpSchema.Tool("tool2", "tool2 description", emptyJsonSchema),
 				request -> callResponse);
 
 		mcpServer.addTool(tool2);
 
 		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
-			assertThat(rootsRef.get()).containsAll(List.of(tool2.tool()));
+			assertThat(toolsRef.get()).containsAll(List.of(tool2.tool()));
 		});
+
+		mcpClient.close();
+		mcpServer.close();
+	}
+
+	@Test
+	void testInitialize() {
+		var mcpServer = McpServer.using(mcpServerTransport).sync();
+		var mcpClient = clientBuilder.sync();
+
+		InitializeResult initResult = mcpClient.initialize();
+		assertThat(initResult).isNotNull();
 
 		mcpClient.close();
 		mcpServer.close();

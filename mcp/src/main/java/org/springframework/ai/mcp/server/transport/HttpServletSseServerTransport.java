@@ -41,40 +41,84 @@ import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.ServerMcpTransport;
 
 /**
- * A Servlet-based implementation of the MCP HTTP with SSE transport specification. This
- * implementation provides similar functionality to FunctionalSseServerTransport but uses
- * the traditional Servlet API instead of WebFlux.
+ * A Servlet-based implementation of the MCP HTTP with Server-Sent Events (SSE) transport
+ * specification. This implementation provides similar functionality to
+ * WebFluxSseServerTransport but uses the traditional Servlet API instead of WebFlux.
+ *
+ * <p>
+ * The transport handles two types of endpoints:
+ * <ul>
+ * <li>SSE endpoint (/sse) - Establishes a long-lived connection for server-to-client
+ * events</li>
+ * <li>Message endpoint (configurable) - Handles client-to-server message requests</li>
+ * </ul>
+ *
+ * <p>
+ * Features:
+ * <ul>
+ * <li>Asynchronous message handling using Servlet 6.0 async support</li>
+ * <li>Session management for multiple client connections</li>
+ * <li>Graceful shutdown support</li>
+ * <li>Error handling and response formatting</li>
+ * </ul>
  *
  * @author Christian Tzolov
- * @since 1.0.0
+ * @see ServerMcpTransport
+ * @see HttpServlet
  */
 
 @WebServlet(asyncSupported = true)
 public class HttpServletSseServerTransport extends HttpServlet implements ServerMcpTransport {
 
+	/** Logger for this class */
 	private static final Logger logger = LoggerFactory.getLogger(HttpServletSseServerTransport.class);
 
+	/** The endpoint path for SSE connections */
 	public static final String SSE_ENDPOINT = "/sse";
 
+	/** Event type for regular messages */
 	public static final String MESSAGE_EVENT_TYPE = "message";
 
+	/** Event type for endpoint information */
 	public static final String ENDPOINT_EVENT_TYPE = "endpoint";
 
+	/** JSON object mapper for serialization/deserialization */
 	private final ObjectMapper objectMapper;
 
+	/** The endpoint path for handling client messages */
 	private final String messageEndpoint;
 
+	/** Map of active client sessions, keyed by session ID */
 	private final Map<String, ClientSession> sessions = new ConcurrentHashMap<>();
 
+	/** Flag indicating if the transport is in the process of shutting down */
 	private final AtomicBoolean isClosing = new AtomicBoolean(false);
 
+	/** Handler for processing incoming messages */
 	private Function<Mono<McpSchema.JSONRPCMessage>, Mono<McpSchema.JSONRPCMessage>> connectHandler;
 
+	/**
+	 * Creates a new HttpServletSseServerTransport instance.
+	 * @param objectMapper The JSON object mapper to use for message
+	 * serialization/deserialization
+	 * @param messageEndpoint The endpoint path where clients will send their messages
+	 */
 	public HttpServletSseServerTransport(ObjectMapper objectMapper, String messageEndpoint) {
 		this.objectMapper = objectMapper;
 		this.messageEndpoint = messageEndpoint;
 	}
 
+	/**
+	 * Handles GET requests to establish SSE connections.
+	 * <p>
+	 * This method sets up a new SSE connection when a client connects to the SSE
+	 * endpoint. It configures the response headers for SSE, creates a new session, and
+	 * sends the initial endpoint information to the client.
+	 * @param request The HTTP servlet request
+	 * @param response The HTTP servlet response
+	 * @throws ServletException If a servlet-specific error occurs
+	 * @throws IOException If an I/O error occurs
+	 */
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
@@ -102,12 +146,23 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 
 		PrintWriter writer = response.getWriter();
 		ClientSession session = new ClientSession(sessionId, asyncContext, writer);
-		sessions.put(sessionId, session);
+		this.sessions.put(sessionId, session);
 
 		// Send initial endpoint event
-		sendEvent(writer, ENDPOINT_EVENT_TYPE, messageEndpoint);
+		this.sendEvent(writer, ENDPOINT_EVENT_TYPE, messageEndpoint);
 	}
 
+	/**
+	 * Handles POST requests for client messages.
+	 * <p>
+	 * This method processes incoming messages from clients, routes them through the
+	 * connect handler if configured, and sends back the appropriate response. It handles
+	 * error cases and formats error responses according to the MCP specification.
+	 * @param request The HTTP servlet request
+	 * @param response The HTTP servlet response
+	 * @throws ServletException If a servlet-specific error occurs
+	 * @throws IOException If an I/O error occurs
+	 */
 	@Override
 	protected void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
@@ -200,12 +255,25 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 		}
 	}
 
+	/**
+	 * Sets up the message handler for processing client requests.
+	 * @param handler The function to process incoming messages and produce responses
+	 * @return A Mono that completes when the handler is set up
+	 */
 	@Override
 	public Mono<Void> connect(Function<Mono<McpSchema.JSONRPCMessage>, Mono<McpSchema.JSONRPCMessage>> handler) {
 		this.connectHandler = handler;
 		return Mono.empty();
 	}
 
+	/**
+	 * Broadcasts a message to all connected clients.
+	 * <p>
+	 * This method serializes the message and sends it to all active client sessions. If a
+	 * client is disconnected, its session is removed.
+	 * @param message The message to broadcast
+	 * @return A Mono that completes when the message has been sent to all clients
+	 */
 	@Override
 	public Mono<Void> sendMessage(McpSchema.JSONRPCMessage message) {
 		if (sessions.isEmpty()) {
@@ -219,7 +287,7 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 
 				sessions.values().forEach(session -> {
 					try {
-						sendEvent(session.writer, MESSAGE_EVENT_TYPE, jsonText);
+						this.sendEvent(session.writer, MESSAGE_EVENT_TYPE, jsonText);
 					}
 					catch (IOException e) {
 						logger.error("Failed to send message to session {}: {}", session.id, e.getMessage());
@@ -236,16 +304,35 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 		});
 	}
 
+	/**
+	 * Closes the transport.
+	 * <p>
+	 * This implementation delegates to the super class's close method.
+	 */
 	@Override
 	public void close() {
 		ServerMcpTransport.super.close();
 	}
 
+	/**
+	 * Unmarshals data from one type to another using the object mapper.
+	 * @param <T> The target type
+	 * @param data The source data
+	 * @param typeRef The type reference for the target type
+	 * @return The unmarshaled data
+	 */
 	@Override
 	public <T> T unmarshalFrom(Object data, TypeReference<T> typeRef) {
 		return objectMapper.convertValue(data, typeRef);
 	}
 
+	/**
+	 * Initiates a graceful shutdown of the transport.
+	 * <p>
+	 * This method marks the transport as closing and closes all active client sessions.
+	 * New connection attempts will be rejected during shutdown.
+	 * @return A Mono that completes when all sessions have been closed
+	 */
 	@Override
 	public Mono<Void> closeGracefully() {
 		isClosing.set(true);
@@ -257,6 +344,13 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 		});
 	}
 
+	/**
+	 * Sends an SSE event to a client.
+	 * @param writer The writer to send the event through
+	 * @param eventType The type of event (message or endpoint)
+	 * @param data The event data
+	 * @throws IOException If an error occurs while writing the event
+	 */
 	private void sendEvent(PrintWriter writer, String eventType, String data) throws IOException {
 		writer.write("event: " + eventType + "\n");
 		writer.write("data: " + data + "\n\n");
@@ -267,11 +361,21 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 		}
 	}
 
+	/**
+	 * Removes a client session and completes its async context.
+	 * @param session The session to remove
+	 */
 	private void removeSession(ClientSession session) {
 		sessions.remove(session.id);
 		session.asyncContext.complete();
 	}
 
+	/**
+	 * Represents a client connection session.
+	 * <p>
+	 * This class holds the necessary information about a client's SSE connection,
+	 * including its ID, async context, and output writer.
+	 */
 	private static class ClientSession {
 
 		private final String id;
@@ -288,6 +392,12 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 
 	}
 
+	/**
+	 * Cleans up resources when the servlet is being destroyed.
+	 * <p>
+	 * This method ensures a graceful shutdown by closing all client connections before
+	 * calling the parent's destroy method.
+	 */
 	@Override
 	public void destroy() {
 		closeGracefully().block();
