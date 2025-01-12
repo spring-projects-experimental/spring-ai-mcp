@@ -15,7 +15,8 @@ Java SDK implementation of the link:https://modelcontextprotocol.io/introduction
 * Multiple transport implementations:
 ** Core transports:
 *** Stdio-based transport for process-based communication
-*** Java HttpClient-based SSE transport for HTTP streaming
+*** Java HttpClient-based SSE client transport for HTTP SSE Client-side streaming
+*** Servlet-based SSE server transport for HTTP SSE Server streaming
 ** Spring-based transports:
 *** WebFlux SSE transport for reactive HTTP streaming
 *** WebMVC SSE transport for servlet-based HTTP streaming
@@ -514,6 +515,41 @@ Implements the MCP HTTP with SSE transport specification, providing:
 * Concurrent client connections through SSE endpoints
 * Message routing and session management
 * Graceful shutdown capabilities
+
+SSE (Servlet)::
++
+Creates a Servlet-based SSE server transport.
+Included in the core `mcp` module.
+The `HttpServletSseServerTransport` can be used with any Servlet container.
+To using it with a Spring Web application, you can register it as a Servlet bean:
++
+[source,java]
+----
+@Configuration
+@EnableWebMvc
+public class McpServerConfig implements WebMvcConfigurer {
+
+	@Bean
+	public HttpServletSseServerTransport servletSseServerTransport() {
+		return new HttpServletSseServerTransport(new ObjectMapper(), "/mcp/message");
+	}
+
+	@Bean
+	public ServletRegistrationBean customServletBean(HttpServletSseServerTransport servlet) {
+		return new ServletRegistrationBean(servlet);
+	}
+}
+----
++
+Implements the MCP HTTP with SSE transport specification using the traditional Servlet API, providing:
++
+* Asynchronous message handling using Servlet 6.0 async support
+* Session management for multiple client connections
+* Two types of endpoints:
+** SSE endpoint (/sse) for server-to-client events
+** Message endpoint (configurable) for client-to-server requests
+* Error handling and response formatting
+* Graceful shutdown support
 
 ======
 

@@ -99,6 +99,7 @@
 		<junit-jupiter.version>5.10.5</junit-jupiter.version>
 		<tomcat.version>11.0.2</tomcat.version>
 		<jakarta.servlet.version>6.1.0</jakarta.servlet.version>
+		<awaitility.version>4.2.0</awaitility.version>
 	</properties>
 
 	<modules>

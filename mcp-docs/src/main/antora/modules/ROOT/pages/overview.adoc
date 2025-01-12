@@ -20,7 +20,8 @@ Core implementation of the Model Context Protocol specification, providing:
 
 * *Core Transports*
 ** Stdio-based (`StdioClientTransport`, `StdioServerTransport`) for process-based communication
-** Java HttpClient-based SSE client (`HttpClientSseClientTransport`) for HTTP streaming
+** Java HttpClient-based SSE client (`HttpClientSseClientTransport`) for HTTP SSE Client-side streaming
+** Servlet-based SSE server (`HttpServletSseServerTransport`) for HTTP SSE Server streaming using traditional Servlet API
 
 * *Optional SSE Transports*
 ** link:https://github.com/spring-projects-experimental/spring-ai-mcp/tree/main/mcp-transport/mcp-webflux-sse-transport[WebFlux SSE Transport] - Reactive HTTP streaming with Spring WebFlux (Client & Server)
@@ -114,6 +115,7 @@ Reffer to the xref:dependency-management.adoc[Dependency Management] page for mo
 * link:https://github.com/habuma/spring-ai-examples/tree/main/spring-ai-mcp[Theme Park API] - MCP server/client with Theme Park API tools
 * link:https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/mcp-webflux-server[WebFlux SSE] - WebFlux server/client implementation
 * link:https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/mcp-webmvc-server[WebMvc SSE] - WebMvc server with HttpClient implementation
+* link:https://github.com/spring-projects/spring-ai-examples/tree/main/model-context-protocol/mcp-servlet-server[Servlet SSE] - SSE Servlet server with HttpClient implementation
 
 == Documentation
 
