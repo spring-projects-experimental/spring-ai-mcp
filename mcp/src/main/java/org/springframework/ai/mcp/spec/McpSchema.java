@@ -98,7 +98,7 @@ public final class McpSchema {
 	// Sampling Methods
 	public static final String METHOD_SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
 
-	private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	// ---------------------------
 	// JSON-RPC Error Codes
@@ -106,7 +106,7 @@ public final class McpSchema {
 	/**
 	 * Standard error codes used in MCP JSON-RPC responses.
 	 */
-	public final class ErrorCodes {
+	public static final class ErrorCodes {
 
 		/**
 		 * Invalid JSON was received by the server.
@@ -698,7 +698,7 @@ public final class McpSchema {
 			
 	} // @formatter:on
 
-	public static JsonSchema parseSchema(String schema) {
+	private static JsonSchema parseSchema(String schema) {
 		try {
 			return OBJECT_MAPPER.readValue(schema, JsonSchema.class);
 		}
