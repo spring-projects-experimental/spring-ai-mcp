@@ -70,16 +70,16 @@ import java.util.function.Function;
  */
 public class HttpClientSseClientTransport implements ClientMcpTransport {
 
-	private final static Logger logger = LoggerFactory.getLogger(HttpClientSseClientTransport.class);
+	private static final Logger logger = LoggerFactory.getLogger(HttpClientSseClientTransport.class);
 
 	/** SSE event type for JSON-RPC messages */
-	private final static String MESSAGE_EVENT_TYPE = "message";
+	private static final String MESSAGE_EVENT_TYPE = "message";
 
 	/** SSE event type for endpoint discovery */
-	private final static String ENDPOINT_EVENT_TYPE = "endpoint";
+	private static final String ENDPOINT_EVENT_TYPE = "endpoint";
 
 	/** Default SSE endpoint path */
-	private final static String SSE_ENDPOINT = "/sse";
+	private static final String SSE_ENDPOINT = "/sse";
 
 	/** Base URI for the MCP server */
 	private final String baseUri;
@@ -170,7 +170,7 @@ public class HttpClientSseClientTransport implements ClientMcpTransport {
 						handler.apply(Mono.just(message)).subscribe();
 					}
 					else {
-						logger.error("Received unrecognized SSE event type: " + event.type());
+						logger.error("Received unrecognized SSE event type: {}", event.type());
 					}
 				}
 				catch (IOException e) {

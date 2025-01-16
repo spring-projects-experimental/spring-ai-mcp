@@ -62,7 +62,7 @@ import org.springframework.ai.mcp.util.Utils;
  */
 public class McpAsyncClient {
 
-	private final static Logger logger = LoggerFactory.getLogger(McpAsyncClient.class);
+	private static final Logger logger = LoggerFactory.getLogger(McpAsyncClient.class);
 
 	private static TypeReference<Void> VOID_TYPE_REFERENCE = new TypeReference<>() {
 	};
@@ -498,7 +498,7 @@ public class McpAsyncClient {
 			logger.error("Error handling tools list change notification", error);
 			return Mono.empty();
 		}).then(); // Convert to Mono<Void>
-	};
+	}
 
 	// --------------------------
 	// Resources
@@ -619,7 +619,7 @@ public class McpAsyncClient {
 			logger.error("Error handling resources list change notification", error);
 			return Mono.empty();
 		}).then();
-	};
+	}
 
 	// --------------------------
 	// Prompts
@@ -680,7 +680,7 @@ public class McpAsyncClient {
 				return Mono.empty();
 			}).then(); // Convert to Mono<Void>
 		}; // @formatter:on
-	};
+	}
 
 	// --------------------------
 	// Logging

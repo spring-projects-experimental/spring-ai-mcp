@@ -57,31 +57,34 @@ import org.springframework.web.reactive.function.server.ServerResponse;
  * {@link Sinks} for thread-safe message broadcasting.
  *
  * @author Christian Tzolov
+ * @author Alexandros Pappas
  * @see ServerMcpTransport
  * @see ServerSentEvent
  */
 public class WebFluxSseServerTransport implements ServerMcpTransport {
 
-	private final static Logger logger = LoggerFactory.getLogger(WebFluxSseServerTransport.class);
+	private static final Logger logger = LoggerFactory.getLogger(WebFluxSseServerTransport.class);
 
 	/**
 	 * Event type for JSON-RPC messages sent through the SSE connection.
 	 */
-	public final static String MESSAGE_EVENT_TYPE = "message";
+	public static final String MESSAGE_EVENT_TYPE = "message";
 
 	/**
 	 * Event type for sending the message endpoint URI to clients.
 	 */
-	public final static String ENDPOINT_EVENT_TYPE = "endpoint";
+	public static final String ENDPOINT_EVENT_TYPE = "endpoint";
 
 	/**
 	 * Default SSE endpoint path as specified by the MCP transport specification.
 	 */
-	public final static String SSE_ENDPOINT = "/sse";
+	public static final String DEFAULT_SSE_ENDPOINT = "/sse";
 
 	private final ObjectMapper objectMapper;
 
 	private final String messageEndpoint;
+
+	private final String sseEndpoint;
 
 	private final RouterFunction<?> routerFunction;
 
@@ -106,16 +109,32 @@ public class WebFluxSseServerTransport implements ServerMcpTransport {
 	 * setup. Must not be null.
 	 * @throws IllegalArgumentException if either parameter is null
 	 */
-	public WebFluxSseServerTransport(ObjectMapper objectMapper, String messageEndpoint) {
+	public WebFluxSseServerTransport(ObjectMapper objectMapper, String messageEndpoint, String sseEndpoint) {
 		Assert.notNull(objectMapper, "ObjectMapper must not be null");
 		Assert.notNull(messageEndpoint, "Message endpoint must not be null");
+		Assert.notNull(sseEndpoint, "SSE endpoint must not be null");
 
 		this.objectMapper = objectMapper;
 		this.messageEndpoint = messageEndpoint;
+		this.sseEndpoint = sseEndpoint;
 		this.routerFunction = RouterFunctions.route()
-			.GET(SSE_ENDPOINT, this::handleSseConnection)
-			.POST(messageEndpoint, this::handleMessage)
+			.GET(this.sseEndpoint, this::handleSseConnection)
+			.POST(this.messageEndpoint, this::handleMessage)
 			.build();
+	}
+
+	/**
+	 * Constructs a new WebFlux SSE server transport instance with the default SSE
+	 * endpoint.
+	 * @param objectMapper The ObjectMapper to use for JSON serialization/deserialization
+	 * of MCP messages. Must not be null.
+	 * @param messageEndpoint The endpoint URI where clients should send their JSON-RPC
+	 * messages. This endpoint will be communicated to clients during SSE connection
+	 * setup. Must not be null.
+	 * @throws IllegalArgumentException if either parameter is null
+	 */
+	public WebFluxSseServerTransport(ObjectMapper objectMapper, String messageEndpoint) {
+		this(objectMapper, messageEndpoint, DEFAULT_SSE_ENDPOINT);
 	}
 
 	/**
@@ -243,7 +262,7 @@ public class WebFluxSseServerTransport implements ServerMcpTransport {
 	 * <p>
 	 * The router function defines two endpoints:
 	 * <ul>
-	 * <li>GET {SSE_ENDPOINT} - For establishing SSE connections</li>
+	 * <li>GET {sseEndpoint} - For establishing SSE connections</li>
 	 * <li>POST {messageEndpoint} - For receiving client messages</li>
 	 * </ul>
 	 * @return The configured {@link RouterFunction} for handling HTTP requests
@@ -343,11 +362,7 @@ public class WebFluxSseServerTransport implements ServerMcpTransport {
 							.bodyValue(new McpError(error.getMessage()));
 					});
 			}
-			catch (IllegalArgumentException e) {
-				logger.error("Failed to deserialize message: {}", e.getMessage());
-				return ServerResponse.badRequest().bodyValue(new McpError("Invalid message format"));
-			}
-			catch (IOException e) {
+			catch (IllegalArgumentException | IOException e) {
 				logger.error("Failed to deserialize message: {}", e.getMessage());
 				return ServerResponse.badRequest().bodyValue(new McpError("Invalid message format"));
 			}

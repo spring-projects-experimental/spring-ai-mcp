@@ -72,31 +72,31 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 public class WebFluxSseClientTransport implements ClientMcpTransport {
 
-	private final static Logger logger = LoggerFactory.getLogger(WebFluxSseClientTransport.class);
+	private static final Logger logger = LoggerFactory.getLogger(WebFluxSseClientTransport.class);
 
 	/**
 	 * Event type for JSON-RPC messages received through the SSE connection. The server
 	 * sends messages with this event type to transmit JSON-RPC protocol data.
 	 */
-	private final static String MESSAGE_EVENT_TYPE = "message";
+	private static final String MESSAGE_EVENT_TYPE = "message";
 
 	/**
 	 * Event type for receiving the message endpoint URI from the server. The server MUST
 	 * send this event when a client connects, providing the URI where the client should
 	 * send its messages via HTTP POST.
 	 */
-	private final static String ENDPOINT_EVENT_TYPE = "endpoint";
+	private static final String ENDPOINT_EVENT_TYPE = "endpoint";
 
 	/**
 	 * Default SSE endpoint path as specified by the MCP transport specification. This
 	 * endpoint is used to establish the SSE connection with the server.
 	 */
-	private final static String SSE_ENDPOINT = "/sse";
+	private static final String SSE_ENDPOINT = "/sse";
 
 	/**
 	 * Type reference for parsing SSE events containing string data.
 	 */
-	private final static ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE = new ParameterizedTypeReference<>() {
+	private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE = new ParameterizedTypeReference<>() {
 	};
 
 	/**

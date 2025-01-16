@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class DefaultMcpSessionTests {
 
-	private final static Logger logger = LoggerFactory.getLogger(DefaultMcpSessionTests.class);
+	private static final Logger logger = LoggerFactory.getLogger(DefaultMcpSessionTests.class);
 
 	private static final Duration TIMEOUT = Duration.ofSeconds(5);
 

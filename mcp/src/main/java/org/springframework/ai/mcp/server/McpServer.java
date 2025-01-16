@@ -208,7 +208,7 @@ public interface McpServer {
 	 */
 	public static class Builder {
 
-		private final static McpSchema.Implementation DEFAULT_SERVER_INFO = new McpSchema.Implementation("mcp-server",
+		private static final McpSchema.Implementation DEFAULT_SERVER_INFO = new McpSchema.Implementation("mcp-server",
 				"1.0.0");
 
 		private final ServerMcpTransport transport;

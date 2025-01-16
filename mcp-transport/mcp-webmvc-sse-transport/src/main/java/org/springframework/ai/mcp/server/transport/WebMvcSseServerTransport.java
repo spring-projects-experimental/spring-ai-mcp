@@ -70,31 +70,34 @@ import org.springframework.web.servlet.function.ServerResponse.SseBuilder;
  * maintains its own SSE connection.
  *
  * @author Christian Tzolov
+ * @author Alexandros Pappas
  * @see ServerMcpTransport
  * @see RouterFunction
  */
 public class WebMvcSseServerTransport implements ServerMcpTransport {
 
-	private final static Logger logger = LoggerFactory.getLogger(WebMvcSseServerTransport.class);
+	private static final Logger logger = LoggerFactory.getLogger(WebMvcSseServerTransport.class);
 
 	/**
 	 * Event type for JSON-RPC messages sent through the SSE connection.
 	 */
-	public final static String MESSAGE_EVENT_TYPE = "message";
+	public static final String MESSAGE_EVENT_TYPE = "message";
 
 	/**
 	 * Event type for sending the message endpoint URI to clients.
 	 */
-	public final static String ENDPOINT_EVENT_TYPE = "endpoint";
+	public static final String ENDPOINT_EVENT_TYPE = "endpoint";
 
 	/**
 	 * Default SSE endpoint path as specified by the MCP transport specification.
 	 */
-	public final static String SSE_ENDPOINT = "/sse";
+	public static final String DEFAULT_SSE_ENDPOINT = "/sse";
 
 	private final ObjectMapper objectMapper;
 
 	private final String messageEndpoint;
+
+	private final String sseEndpoint;
 
 	private final RouterFunction<ServerResponse> routerFunction;
 
@@ -122,16 +125,31 @@ public class WebMvcSseServerTransport implements ServerMcpTransport {
 	 * SSE connection's initial endpoint event.
 	 * @throws IllegalArgumentException if either objectMapper or messageEndpoint is null
 	 */
-	public WebMvcSseServerTransport(ObjectMapper objectMapper, String messageEndpoint) {
+	public WebMvcSseServerTransport(ObjectMapper objectMapper, String messageEndpoint, String sseEndpoint) {
 		Assert.notNull(objectMapper, "ObjectMapper must not be null");
 		Assert.notNull(messageEndpoint, "Message endpoint must not be null");
+		Assert.notNull(sseEndpoint, "SSE endpoint must not be null");
 
 		this.objectMapper = objectMapper;
 		this.messageEndpoint = messageEndpoint;
+		this.sseEndpoint = sseEndpoint;
 		this.routerFunction = RouterFunctions.route()
-			.GET(SSE_ENDPOINT, this::handleSseConnection)
-			.POST(messageEndpoint, this::handleMessage)
+			.GET(this.sseEndpoint, this::handleSseConnection)
+			.POST(this.messageEndpoint, this::handleMessage)
 			.build();
+	}
+
+	/**
+	 * Constructs a new WebMvcSseServerTransport instance with the default SSE endpoint.
+	 * @param objectMapper The ObjectMapper to use for JSON serialization/deserialization
+	 * of messages.
+	 * @param messageEndpoint The endpoint URI where clients should send their JSON-RPC
+	 * messages via HTTP POST. This endpoint will be communicated to clients through the
+	 * SSE connection's initial endpoint event.
+	 * @throws IllegalArgumentException if either objectMapper or messageEndpoint is null
+	 */
+	public WebMvcSseServerTransport(ObjectMapper objectMapper, String messageEndpoint) {
+		this(objectMapper, messageEndpoint, DEFAULT_SSE_ENDPOINT);
 	}
 
 	/**

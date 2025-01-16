@@ -140,7 +140,7 @@ public final class McpSchema {
 
 	}
 
-	private final static TypeReference<HashMap<String, Object>> MAP_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<HashMap<String, Object>> MAP_TYPE_REF = new TypeReference<>() {
 	};
 
 	/**

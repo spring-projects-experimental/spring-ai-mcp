@@ -54,7 +54,7 @@ import org.springframework.ai.mcp.util.Utils;
  */
 public class McpAsyncServer {
 
-	private final static Logger logger = LoggerFactory.getLogger(McpAsyncServer.class);
+	private static final Logger logger = LoggerFactory.getLogger(McpAsyncServer.class);
 
 	/**
 	 * The MCP session implementation that manages bidirectional JSON-RPC communication
@@ -279,7 +279,7 @@ public class McpAsyncServer {
 				return Mono.empty();
 			}).then();
 		};
-	};
+	}
 
 	// ---------------------------------------
 	// Tool Management
@@ -352,9 +352,7 @@ public class McpAsyncServer {
 	private DefaultMcpSession.RequestHandler toolsListRequestHandler() {
 		return params -> {
 
-			List<Tool> tools = this.tools.stream().map(toolRegistration -> {
-				return toolRegistration.tool();
-			}).toList();
+			List<Tool> tools = this.tools.stream().map(ToolRegistration::tool).toList();
 
 			return Mono.just(new McpSchema.ListToolsResult(tools, null));
 		};

@@ -63,6 +63,7 @@ import org.springframework.ai.mcp.spec.ServerMcpTransport;
  * </ul>
  *
  * @author Christian Tzolov
+ * @author Alexandros Pappas
  * @see ServerMcpTransport
  * @see HttpServlet
  */
@@ -73,8 +74,14 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 	/** Logger for this class */
 	private static final Logger logger = LoggerFactory.getLogger(HttpServletSseServerTransport.class);
 
-	/** The endpoint path for SSE connections */
-	public static final String SSE_ENDPOINT = "/sse";
+	public static final String UTF_8 = "UTF-8";
+
+	public static final String APPLICATION_JSON = "application/json";
+
+	public static final String FAILED_TO_SEND_ERROR_RESPONSE = "Failed to send error response: {}";
+
+	/** Default endpoint path for SSE connections */
+	public static final String DEFAULT_SSE_ENDPOINT = "/sse";
 
 	/** Event type for regular messages */
 	public static final String MESSAGE_EVENT_TYPE = "message";
@@ -88,6 +95,9 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 	/** The endpoint path for handling client messages */
 	private final String messageEndpoint;
 
+	/** The endpoint path for handling SSE connections */
+	private final String sseEndpoint;
+
 	/** Map of active client sessions, keyed by session ID */
 	private final Map<String, ClientSession> sessions = new ConcurrentHashMap<>();
 
@@ -98,14 +108,26 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 	private Function<Mono<McpSchema.JSONRPCMessage>, Mono<McpSchema.JSONRPCMessage>> connectHandler;
 
 	/**
-	 * Creates a new HttpServletSseServerTransport instance.
+	 * Creates a new HttpServletSseServerTransport instance with a custom SSE endpoint.
+	 * @param objectMapper The JSON object mapper to use for message
+	 * serialization/deserialization
+	 * @param messageEndpoint The endpoint path where clients will send their messages
+	 * @param sseEndpoint The endpoint path where clients will establish SSE connections
+	 */
+	public HttpServletSseServerTransport(ObjectMapper objectMapper, String messageEndpoint, String sseEndpoint) {
+		this.objectMapper = objectMapper;
+		this.messageEndpoint = messageEndpoint;
+		this.sseEndpoint = sseEndpoint;
+	}
+
+	/**
+	 * Creates a new HttpServletSseServerTransport instance with the default SSE endpoint.
 	 * @param objectMapper The JSON object mapper to use for message
 	 * serialization/deserialization
 	 * @param messageEndpoint The endpoint path where clients will send their messages
 	 */
 	public HttpServletSseServerTransport(ObjectMapper objectMapper, String messageEndpoint) {
-		this.objectMapper = objectMapper;
-		this.messageEndpoint = messageEndpoint;
+		this(objectMapper, messageEndpoint, DEFAULT_SSE_ENDPOINT);
 	}
 
 	/**
@@ -124,7 +146,7 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 			throws ServletException, IOException {
 
 		String pathInfo = request.getPathInfo();
-		if (!SSE_ENDPOINT.equals(pathInfo)) {
+		if (!sseEndpoint.equals(pathInfo)) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND);
 			return;
 		}
@@ -135,7 +157,7 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 		}
 
 		response.setContentType("text/event-stream");
-		response.setCharacterEncoding("UTF-8");
+		response.setCharacterEncoding(UTF_8);
 		response.setHeader("Cache-Control", "no-cache");
 		response.setHeader("Connection", "keep-alive");
 		response.setHeader("Access-Control-Allow-Origin", "*");
@@ -191,8 +213,8 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 			if (connectHandler != null) {
 				connectHandler.apply(Mono.just(message)).subscribe(responseMessage -> {
 					try {
-						response.setContentType("application/json");
-						response.setCharacterEncoding("UTF-8");
+						response.setContentType(APPLICATION_JSON);
+						response.setCharacterEncoding(UTF_8);
 						String jsonResponse = objectMapper.writeValueAsString(responseMessage);
 						PrintWriter writer = response.getWriter();
 						writer.write(jsonResponse);
@@ -205,15 +227,15 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 									"Error processing response: " + e.getMessage());
 						}
 						catch (IOException ex) {
-							logger.error("Failed to send error response: {}", ex.getMessage());
+							logger.error(FAILED_TO_SEND_ERROR_RESPONSE, ex.getMessage());
 						}
 					}
 				}, error -> {
 					try {
 						logger.error("Error processing message: {}", error.getMessage());
 						McpError mcpError = new McpError(error.getMessage());
-						response.setContentType("application/json");
-						response.setCharacterEncoding("UTF-8");
+						response.setContentType(APPLICATION_JSON);
+						response.setCharacterEncoding(UTF_8);
 						response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						String jsonError = objectMapper.writeValueAsString(mcpError);
 						PrintWriter writer = response.getWriter();
@@ -221,13 +243,13 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 						writer.flush();
 					}
 					catch (IOException e) {
-						logger.error("Failed to send error response: {}", e.getMessage());
+						logger.error(FAILED_TO_SEND_ERROR_RESPONSE, e.getMessage());
 						try {
 							response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
 									"Error sending error response: " + e.getMessage());
 						}
 						catch (IOException ex) {
-							logger.error("Failed to send error response: {}", ex.getMessage());
+							logger.error(FAILED_TO_SEND_ERROR_RESPONSE, ex.getMessage());
 						}
 					}
 				});
@@ -240,8 +262,8 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 			logger.error("Invalid message format: {}", e.getMessage());
 			try {
 				McpError mcpError = new McpError("Invalid message format: " + e.getMessage());
-				response.setContentType("application/json");
-				response.setCharacterEncoding("UTF-8");
+				response.setContentType(APPLICATION_JSON);
+				response.setCharacterEncoding(UTF_8);
 				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				String jsonError = objectMapper.writeValueAsString(mcpError);
 				PrintWriter writer = response.getWriter();
@@ -249,7 +271,7 @@ public class HttpServletSseServerTransport extends HttpServlet implements Server
 				writer.flush();
 			}
 			catch (IOException ex) {
-				logger.error("Failed to send error response: {}", ex.getMessage());
+				logger.error(FAILED_TO_SEND_ERROR_RESPONSE, ex.getMessage());
 				response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid message format");
 			}
 		}
