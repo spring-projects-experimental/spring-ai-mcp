@@ -25,6 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.spec.ClientMcpTransport;
@@ -77,10 +78,10 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 		this.mcpTransport = createMcpTransport();
 
 		assertThatCode(() -> {
-			mcpAsyncClient = McpClient.using(mcpTransport)
+			mcpAsyncClient = McpClient.async(mcpTransport)
 				.requestTimeout(TIMEOUT)
 				.capabilities(ClientCapabilities.builder().roots(true).build())
-				.async();
+				.build();
 			mcpAsyncClient.initialize().block(Duration.ofSeconds(10));
 		}).doesNotThrowAnyException();
 	}
@@ -96,10 +97,10 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 
 	@Test
 	void testConstructorWithInvalidArguments() {
-		assertThatThrownBy(() -> McpClient.using(null).sync()).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> McpClient.sync(null).build()).isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Transport must not be null");
 
-		assertThatThrownBy(() -> McpClient.using(mcpTransport).requestTimeout(null).sync())
+		assertThatThrownBy(() -> McpClient.sync(mcpTransport).requestTimeout(null).build())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Request timeout must not be null");
 	}
@@ -195,10 +196,10 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 	void testInitializeWithRootsListProviders() {
 		var transport = createMcpTransport();
 
-		var client = McpClient.using(transport)
+		var client = McpClient.async(transport)
 			.requestTimeout(TIMEOUT)
 			.roots(new Root("file:///test/path", "test-root"))
-			.async();
+			.build();
 
 		assertThatCode(() -> client.initialize().block(Duration.ofSeconds(10))).doesNotThrowAnyException();
 
@@ -277,12 +278,12 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 		AtomicBoolean promptsNotificationReceived = new AtomicBoolean(false);
 
 		var transport = createMcpTransport();
-		var client = McpClient.using(transport)
+		var client = McpClient.async(transport)
 			.requestTimeout(TIMEOUT)
-			.toolsChangeConsumer(tools -> toolsNotificationReceived.set(true))
-			.resourcesChangeConsumer(resources -> resourcesNotificationReceived.set(true))
-			.promptsChangeConsumer(prompts -> promptsNotificationReceived.set(true))
-			.async();
+			.toolsChangeConsumer(tools -> Mono.fromRunnable(() -> toolsNotificationReceived.set(true)))
+			.resourcesChangeConsumer(resources -> Mono.fromRunnable(() -> resourcesNotificationReceived.set(true)))
+			.promptsChangeConsumer(prompts -> Mono.fromRunnable(() -> promptsNotificationReceived.set(true)))
+			.build();
 
 		assertThatCode(() -> {
 			client.initialize().block();
@@ -299,9 +300,11 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 
 		var capabilities = ClientCapabilities.builder().sampling().build();
 
-		var client = McpClient.using(transport).requestTimeout(TIMEOUT).capabilities(capabilities).sampling(request -> {
-			return CreateMessageResult.builder().message("test").model("test-model").build();
-		}).async();
+		var client = McpClient.async(transport)
+			.requestTimeout(TIMEOUT)
+			.capabilities(capabilities)
+			.sampling(request -> Mono.just(CreateMessageResult.builder().message("test").model("test-model").build()))
+			.build();
 
 		assertThatCode(() -> {
 			client.initialize().block(Duration.ofSeconds(10));
@@ -319,14 +322,13 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 			.sampling()
 			.build();
 
-		Function<CreateMessageRequest, CreateMessageResult> samplingHandler = request -> {
-			return CreateMessageResult.builder().message("test").model("test-model").build();
-		};
-		var client = McpClient.using(transport)
+		Function<CreateMessageRequest, Mono<CreateMessageResult>> samplingHandler = request -> Mono
+			.just(CreateMessageResult.builder().message("test").model("test-model").build());
+		var client = McpClient.async(transport)
 			.requestTimeout(TIMEOUT)
 			.capabilities(capabilities)
 			.sampling(samplingHandler)
-			.async();
+			.build();
 
 		assertThatCode(() -> {
 			var result = client.initialize().block(Duration.ofSeconds(10));
@@ -353,10 +355,10 @@ public abstract class BlaAbstractMcpAsyncClientTests {
 		AtomicBoolean logReceived = new AtomicBoolean(false);
 		var transport = createMcpTransport();
 
-		var client = McpClient.using(transport)
+		var client = McpClient.async(transport)
 			.requestTimeout(TIMEOUT)
-			.loggingConsumer(notification -> logReceived.set(true))
-			.async();
+			.loggingConsumer(notification -> Mono.fromRunnable(() -> logReceived.set(true)))
+			.build();
 
 		assertThatCode(() -> {
 			client.initialize().block(Duration.ofSeconds(10));

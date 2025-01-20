@@ -27,6 +27,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 
 import org.springframework.ai.mcp.MockMcpTransport;
 import org.springframework.ai.mcp.spec.McpError;
@@ -48,12 +49,11 @@ class McpAsyncClientResponseHandlerTests {
 		List<McpSchema.Tool> receivedTools = new ArrayList<>();
 
 		// Create a consumer that will be called when tools change
-		Consumer<List<McpSchema.Tool>> toolsChangeConsumer = tools -> {
-			receivedTools.addAll(tools);
-		};
+		Function<List<McpSchema.Tool>, Mono<Void>> toolsChangeConsumer = tools -> Mono
+			.fromRunnable(() -> receivedTools.addAll(tools));
 
 		// Create client with tools change consumer
-		McpAsyncClient asyncMcpClient = McpClient.using(transport).toolsChangeConsumer(toolsChangeConsumer).async();
+		McpAsyncClient asyncMcpClient = McpClient.async(transport).toolsChangeConsumer(toolsChangeConsumer).build();
 
 		// Create a mock tools list that the server will return
 		Map<String, Object> inputSchema = Map.of("type", "object", "properties", Map.of(), "required", List.of());
@@ -88,9 +88,9 @@ class McpAsyncClientResponseHandlerTests {
 	void testRootsListRequestHandling() {
 		MockMcpTransport transport = new MockMcpTransport();
 
-		McpAsyncClient asyncMcpClient = McpClient.using(transport)
+		McpAsyncClient asyncMcpClient = McpClient.async(transport)
 			.roots(new Root("file:///test/path", "test-root"))
-			.async();
+			.build();
 
 		// Simulate incoming request
 		McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(McpSchema.JSONRPC_VERSION,
@@ -118,14 +118,13 @@ class McpAsyncClientResponseHandlerTests {
 		List<McpSchema.Resource> receivedResources = new ArrayList<>();
 
 		// Create a consumer that will be called when resources change
-		Consumer<List<McpSchema.Resource>> resourcesChangeConsumer = resources -> {
-			receivedResources.addAll(resources);
-		};
+		Function<List<McpSchema.Resource>, Mono<Void>> resourcesChangeConsumer = resources -> Mono
+			.fromRunnable(() -> receivedResources.addAll(resources));
 
 		// Create client with resources change consumer
-		McpAsyncClient asyncMcpClient = McpClient.using(transport)
+		McpAsyncClient asyncMcpClient = McpClient.async(transport)
 			.resourcesChangeConsumer(resourcesChangeConsumer)
-			.async();
+			.build();
 
 		// Create a mock resources list that the server will return
 		McpSchema.Resource mockResource = new McpSchema.Resource("test://resource", "Test Resource", "A test resource",
@@ -165,12 +164,11 @@ class McpAsyncClientResponseHandlerTests {
 		List<McpSchema.Prompt> receivedPrompts = new ArrayList<>();
 
 		// Create a consumer that will be called when prompts change
-		Consumer<List<McpSchema.Prompt>> promptsChangeConsumer = prompts -> {
-			receivedPrompts.addAll(prompts);
-		};
+		Function<List<McpSchema.Prompt>, Mono<Void>> promptsChangeConsumer = prompts -> Mono
+			.fromRunnable(() -> receivedPrompts.addAll(prompts));
 
 		// Create client with prompts change consumer
-		McpAsyncClient asyncMcpClient = McpClient.using(transport).promptsChangeConsumer(promptsChangeConsumer).async();
+		McpAsyncClient asyncMcpClient = McpClient.async(transport).promptsChangeConsumer(promptsChangeConsumer).build();
 
 		// Create a mock prompts list that the server will return
 		McpSchema.Prompt mockPrompt = new McpSchema.Prompt("test-prompt", "Test Prompt Description",
@@ -207,17 +205,17 @@ class McpAsyncClientResponseHandlerTests {
 		MockMcpTransport transport = new MockMcpTransport();
 
 		// Create a test sampling handler that echoes back the input
-		Function<McpSchema.CreateMessageRequest, McpSchema.CreateMessageResult> samplingHandler = request -> {
+		Function<McpSchema.CreateMessageRequest, Mono<McpSchema.CreateMessageResult>> samplingHandler = request -> {
 			var content = request.messages().get(0).content();
-			return new McpSchema.CreateMessageResult(McpSchema.Role.ASSISTANT, content, "test-model",
-					McpSchema.CreateMessageResult.StopReason.END_TURN);
+			return Mono.just(new McpSchema.CreateMessageResult(McpSchema.Role.ASSISTANT, content, "test-model",
+					McpSchema.CreateMessageResult.StopReason.END_TURN));
 		};
 
 		// Create client with sampling capability and handler
-		McpAsyncClient asyncMcpClient = McpClient.using(transport)
+		McpAsyncClient asyncMcpClient = McpClient.async(transport)
 			.capabilities(ClientCapabilities.builder().sampling().build())
 			.sampling(samplingHandler)
-			.async();
+			.build();
 
 		// Create a mock create message request
 		var messageRequest = new McpSchema.CreateMessageRequest(
@@ -259,9 +257,9 @@ class McpAsyncClientResponseHandlerTests {
 		MockMcpTransport transport = new MockMcpTransport();
 
 		// Create client without sampling capability
-		McpAsyncClient asyncMcpClient = McpClient.using(transport)
+		McpAsyncClient asyncMcpClient = McpClient.async(transport)
 			.capabilities(ClientCapabilities.builder().build()) // No sampling capability
-			.async();
+			.build();
 
 		// Create a mock create message request
 		var messageRequest = new McpSchema.CreateMessageRequest(
@@ -292,7 +290,7 @@ class McpAsyncClientResponseHandlerTests {
 
 		// Create client with sampling capability but null handler
 		assertThatThrownBy(
-				() -> McpClient.using(transport).capabilities(ClientCapabilities.builder().sampling().build()).async())
+				() -> McpClient.async(transport).capabilities(ClientCapabilities.builder().sampling().build()).build())
 			.isInstanceOf(McpError.class)
 			.hasMessage("Sampling handler must not be null when client capabilities include sampling");
 	}

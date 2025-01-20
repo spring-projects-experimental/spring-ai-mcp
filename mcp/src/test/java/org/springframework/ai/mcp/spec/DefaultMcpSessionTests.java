@@ -150,7 +150,7 @@ class DefaultMcpSessionTests {
 	@Test
 	void testRequestHandling() {
 		String echoMessage = "Hello MCP!";
-		Map<String, DefaultMcpSession.RequestHandler> requestHandlers = Map.of(ECHO_METHOD,
+		Map<String, DefaultMcpSession.RequestHandler<?>> requestHandlers = Map.of(ECHO_METHOD,
 				params -> Mono.just(params));
 		transport = new MockMcpTransport();
 		session = new DefaultMcpSession(TIMEOUT, transport, requestHandlers, Map.of());

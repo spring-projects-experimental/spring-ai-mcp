@@ -35,7 +35,6 @@ import reactor.test.StepVerifier;
 
 import org.springframework.ai.mcp.client.McpClient;
 import org.springframework.ai.mcp.client.transport.HttpClientSseClientTransport;
-import org.springframework.ai.mcp.server.McpServer.ToolRegistration;
 import org.springframework.ai.mcp.server.transport.WebMvcSseServerTransport;
 import org.springframework.ai.mcp.spec.McpError;
 import org.springframework.ai.mcp.spec.McpSchema;
@@ -71,7 +70,7 @@ public class WebMvcSseIntegrationTests {
 
 	private WebMvcSseServerTransport mcpServerTransport;
 
-	McpClient.Builder clientBuilder;
+	McpClient.SyncSpec clientBuilder;
 
 	@Configuration
 	@EnableWebMvc
@@ -137,7 +136,7 @@ public class WebMvcSseIntegrationTests {
 			throw new RuntimeException("Failed to start Tomcat", e);
 		}
 
-		this.clientBuilder = McpClient.using(new HttpClientSseClientTransport("http://localhost:" + PORT));
+		this.clientBuilder = McpClient.sync(new HttpClientSseClientTransport("http://localhost:" + PORT));
 	}
 
 	@AfterEach
@@ -164,7 +163,7 @@ public class WebMvcSseIntegrationTests {
 	// ---------------------------------------
 	@Test
 	void testCreateMessageWithoutInitialization() {
-		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
+		var mcpAsyncServer = McpServer.async(mcpServerTransport).serverInfo("test-server", "1.0.0").build();
 
 		var messages = List
 			.of(new McpSchema.SamplingMessage(McpSchema.Role.USER, new McpSchema.TextContent("Test message")));
@@ -182,9 +181,9 @@ public class WebMvcSseIntegrationTests {
 	@Test
 	void testCreateMessageWithoutSamplingCapabilities() {
 
-		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
+		var mcpAsyncServer = McpServer.async(mcpServerTransport).serverInfo("test-server", "1.0.0").build();
 
-		var client = clientBuilder.clientInfo(new McpSchema.Implementation("Sample client", "0.0.0")).sync();
+		var client = clientBuilder.clientInfo(new McpSchema.Implementation("Sample " + "client", "0.0.0")).build();
 
 		InitializeResult initResult = client.initialize();
 		assertThat(initResult).isNotNull();
@@ -205,7 +204,7 @@ public class WebMvcSseIntegrationTests {
 	@Test
 	void testCreateMessageSuccess() throws InterruptedException {
 
-		var mcpAsyncServer = McpServer.using(mcpServerTransport).serverInfo("test-server", "1.0.0").async();
+		var mcpAsyncServer = McpServer.async(mcpServerTransport).serverInfo("test-server", "1.0.0").build();
 
 		Function<CreateMessageRequest, CreateMessageResult> samplingHandler = request -> {
 			assertThat(request.messages()).hasSize(1);
@@ -218,7 +217,7 @@ public class WebMvcSseIntegrationTests {
 		var client = clientBuilder.clientInfo(new McpSchema.Implementation("Sample client", "0.0.0"))
 			.capabilities(ClientCapabilities.builder().sampling().build())
 			.sampling(samplingHandler)
-			.sync();
+			.build();
 
 		InitializeResult initResult = client.initialize();
 		assertThat(initResult).isNotNull();
@@ -248,13 +247,13 @@ public class WebMvcSseIntegrationTests {
 		List<Root> roots = List.of(new Root("uri1://", "root1"), new Root("uri2://", "root2"));
 
 		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
-		var mcpServer = McpServer.using(mcpServerTransport)
+		var mcpServer = McpServer.sync(mcpServerTransport)
 			.rootsChangeConsumer(rootsUpdate -> rootsRef.set(rootsUpdate))
-			.sync();
+			.build();
 
 		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
 			.roots(roots)
-			.sync();
+			.build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -290,12 +289,12 @@ public class WebMvcSseIntegrationTests {
 
 	@Test
 	void testRootsWithoutCapability() {
-		var mcpServer = McpServer.using(mcpServerTransport).rootsChangeConsumer(rootsUpdate -> {
-		}).sync();
+		var mcpServer = McpServer.sync(mcpServerTransport).rootsChangeConsumer(rootsUpdate -> {
+		}).build();
 
 		// Create client without roots capability
 		// No roots capability
-		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().build()).sync();
+		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().build()).build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -311,13 +310,13 @@ public class WebMvcSseIntegrationTests {
 	@Test
 	void testRootsWithEmptyRootsList() {
 		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
-		var mcpServer = McpServer.using(mcpServerTransport)
+		var mcpServer = McpServer.sync(mcpServerTransport)
 			.rootsChangeConsumer(rootsUpdate -> rootsRef.set(rootsUpdate))
-			.sync();
+			.build();
 
 		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
 			.roots(List.of()) // Empty roots list
-			.sync();
+			.build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -339,14 +338,14 @@ public class WebMvcSseIntegrationTests {
 		AtomicReference<List<Root>> rootsRef1 = new AtomicReference<>();
 		AtomicReference<List<Root>> rootsRef2 = new AtomicReference<>();
 
-		var mcpServer = McpServer.using(mcpServerTransport)
+		var mcpServer = McpServer.sync(mcpServerTransport)
 			.rootsChangeConsumer(rootsUpdate -> rootsRef1.set(rootsUpdate))
 			.rootsChangeConsumer(rootsUpdate -> rootsRef2.set(rootsUpdate))
-			.sync();
+			.build();
 
 		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
 			.roots(roots)
-			.sync();
+			.build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -367,13 +366,13 @@ public class WebMvcSseIntegrationTests {
 		List<Root> roots = List.of(new Root("uri1://", "root1"));
 
 		AtomicReference<List<Root>> rootsRef = new AtomicReference<>();
-		var mcpServer = McpServer.using(mcpServerTransport)
+		var mcpServer = McpServer.sync(mcpServerTransport)
 			.rootsChangeConsumer(rootsUpdate -> rootsRef.set(rootsUpdate))
-			.sync();
+			.build();
 
 		var mcpClient = clientBuilder.capabilities(ClientCapabilities.builder().roots(true).build())
 			.roots(roots)
-			.sync();
+			.build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -407,8 +406,8 @@ public class WebMvcSseIntegrationTests {
 	void testToolCallSuccess() {
 
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
-		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
-				request -> {
+		McpServerFeatures.SyncToolRegistration tool1 = new McpServerFeatures.SyncToolRegistration(
+				new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema), request -> {
 					// perform a blocking call to a remote service
 					String response = RestClient.create()
 						.get()
@@ -419,12 +418,12 @@ public class WebMvcSseIntegrationTests {
 					return callResponse;
 				});
 
-		var mcpServer = McpServer.using(mcpServerTransport)
+		var mcpServer = McpServer.sync(mcpServerTransport)
 			.capabilities(ServerCapabilities.builder().tools(true).build())
 			.tools(tool1)
-			.sync();
+			.build();
 
-		var mcpClient = clientBuilder.sync();
+		var mcpClient = clientBuilder.build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -444,8 +443,8 @@ public class WebMvcSseIntegrationTests {
 	void testToolListChangeHandlingSuccess() {
 
 		var callResponse = new McpSchema.CallToolResult(List.of(new McpSchema.TextContent("CALL RESPONSE")), null);
-		ToolRegistration tool1 = new ToolRegistration(new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema),
-				request -> {
+		McpServerFeatures.SyncToolRegistration tool1 = new McpServerFeatures.SyncToolRegistration(
+				new McpSchema.Tool("tool1", "tool1 description", emptyJsonSchema), request -> {
 					// perform a blocking call to a remote service
 					String response = RestClient.create()
 						.get()
@@ -456,10 +455,10 @@ public class WebMvcSseIntegrationTests {
 					return callResponse;
 				});
 
-		var mcpServer = McpServer.using(mcpServerTransport)
+		var mcpServer = McpServer.sync(mcpServerTransport)
 			.capabilities(ServerCapabilities.builder().tools(true).build())
 			.tools(tool1)
-			.sync();
+			.build();
 
 		AtomicReference<List<Tool>> rootsRef = new AtomicReference<>();
 		var mcpClient = clientBuilder.toolsChangeConsumer(toolsUpdate -> {
@@ -471,7 +470,7 @@ public class WebMvcSseIntegrationTests {
 				.body(String.class);
 			assertThat(response).isNotBlank();
 			rootsRef.set(toolsUpdate);
-		}).sync();
+		}).build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();
@@ -494,8 +493,8 @@ public class WebMvcSseIntegrationTests {
 		});
 
 		// Add a new tool
-		ToolRegistration tool2 = new ToolRegistration(new McpSchema.Tool("tool2", "tool2 description", emptyJsonSchema),
-				request -> callResponse);
+		McpServerFeatures.SyncToolRegistration tool2 = new McpServerFeatures.SyncToolRegistration(
+				new McpSchema.Tool("tool2", "tool2 description", emptyJsonSchema), request -> callResponse);
 
 		mcpServer.addTool(tool2);
 
@@ -510,9 +509,9 @@ public class WebMvcSseIntegrationTests {
 	@Test
 	void testInitialize() {
 
-		var mcpServer = McpServer.using(mcpServerTransport).sync();
+		var mcpServer = McpServer.sync(mcpServerTransport).build();
 
-		var mcpClient = clientBuilder.sync();
+		var mcpClient = clientBuilder.build();
 
 		InitializeResult initResult = mcpClient.initialize();
 		assertThat(initResult).isNotNull();

@@ -63,7 +63,7 @@ public class DefaultMcpSession implements McpSession {
 	private final ConcurrentHashMap<Object, MonoSink<McpSchema.JSONRPCResponse>> pendingResponses = new ConcurrentHashMap<>();
 
 	/** Map of request handlers keyed by method name */
-	private final ConcurrentHashMap<String, RequestHandler> requestHandlers = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, RequestHandler<?>> requestHandlers = new ConcurrentHashMap<>();
 
 	/** Map of notification handlers keyed by method name */
 	private final ConcurrentHashMap<String, NotificationHandler> notificationHandlers = new ConcurrentHashMap<>();
@@ -79,16 +79,18 @@ public class DefaultMcpSession implements McpSession {
 	/**
 	 * Functional interface for handling incoming JSON-RPC requests. Implementations
 	 * should process the request parameters and return a response.
+	 *
+	 * @param <T> Response type
 	 */
 	@FunctionalInterface
-	public interface RequestHandler {
+	public interface RequestHandler<T> {
 
 		/**
 		 * Handles an incoming request with the given parameters.
 		 * @param params The request parameters
 		 * @return A Mono containing the response object
 		 */
-		Mono<Object> handle(Object params);
+		Mono<T> handle(Object params);
 
 	}
 
@@ -116,7 +118,7 @@ public class DefaultMcpSession implements McpSession {
 	 * @param notificationHandlers Map of method names to notification handlers
 	 */
 	public DefaultMcpSession(Duration requestTimeout, McpTransport transport,
-			Map<String, RequestHandler> requestHandlers, Map<String, NotificationHandler> notificationHandlers) {
+			Map<String, RequestHandler<?>> requestHandlers, Map<String, NotificationHandler> notificationHandlers) {
 
 		Assert.notNull(requestTimeout, "The requstTimeout can not be null");
 		Assert.notNull(transport, "The transport can not be null");

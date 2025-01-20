@@ -26,6 +26,7 @@ import com.fasterxml.jackson.module.jsonSchema.JsonSchemaGenerator;
 
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.mcp.server.McpServer;
+import org.springframework.ai.mcp.server.McpServerFeatures;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.model.ModelOptionsUtils;
 import org.springframework.ai.model.function.FunctionCallback;
@@ -60,12 +61,60 @@ public final class ToolHelper {
 	private ToolHelper() {
 	}
 
+	public static List<McpServerFeatures.SyncToolRegistration> toSyncToolRegistration(
+			List<FunctionCallback> functionCallbacks) {
+		return functionCallbacks.stream().map(ToolHelper::toSyncToolRegistration).toList();
+	}
+
+	@Deprecated
 	public static List<McpServer.ToolRegistration> toToolRegistration(List<FunctionCallback> functionCallbacks) {
 		return functionCallbacks.stream().map(ToolHelper::toToolRegistration).toList();
 	}
 
+	public static List<McpServerFeatures.SyncToolRegistration> toSyncToolRegistration(
+			FunctionCallback... functionCallbacks) {
+		return toSyncToolRegistration(List.of(functionCallbacks));
+	}
+
+	@Deprecated
 	public static List<McpServer.ToolRegistration> toToolRegistration(FunctionCallback... functionCallbacks) {
 		return toToolRegistration(List.of(functionCallbacks));
+	}
+
+	/**
+	 * Converts a Spring AI FunctionCallback to an MCP SyncToolRegistration. This enables
+	 * Spring AI functions to be exposed as MCP tools that can be discovered and invoked
+	 * by language models.
+	 *
+	 * <p>
+	 * The conversion process:
+	 * <ul>
+	 * <li>Creates an MCP Tool with the function's name and input schema</li>
+	 * <li>Wraps the function's execution in a SyncToolRegistration that handles the MCP
+	 * protocol</li>
+	 * <li>Provides error handling and result formatting according to MCP
+	 * specifications</li>
+	 * </ul>
+	 *
+	 * You can use the FunctionCallback builder to create a new instance of
+	 * FunctionCallback using either java.util.function.Function or Method reference.
+	 * @param functionCallback the Spring AI function callback to convert
+	 * @return an MCP SyncToolRegistration that wraps the function callback
+	 * @throws RuntimeException if there's an error during the function execution
+	 */
+	public static McpServerFeatures.SyncToolRegistration toSyncToolRegistration(FunctionCallback functionCallback) {
+		var tool = new McpSchema.Tool(functionCallback.getName(), functionCallback.getName(),
+				functionCallback.getInputTypeSchema());
+
+		return new McpServerFeatures.SyncToolRegistration(tool, request -> {
+			try {
+				String callResult = functionCallback.call(ModelOptionsUtils.toJsonString(request));
+				return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(callResult)), false);
+			}
+			catch (Exception e) {
+				return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(e.getMessage())), true);
+			}
+		});
 	}
 
 	/**
@@ -88,7 +137,9 @@ public final class ToolHelper {
 	 * @param functionCallback the Spring AI function callback to convert
 	 * @return an MCP ToolRegistration that wraps the function callback
 	 * @throws RuntimeException if there's an error during the function execution
+	 * @deprecated Use {@link #toSyncToolRegistration(FunctionCallback)}.
 	 */
+	@Deprecated
 	public static McpServer.ToolRegistration toToolRegistration(FunctionCallback functionCallback) {
 
 		var tool = new McpSchema.Tool(functionCallback.getName(), functionCallback.getName(),

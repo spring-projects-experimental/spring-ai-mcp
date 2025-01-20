@@ -27,6 +27,7 @@ import java.util.function.Function;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -109,12 +110,95 @@ public class McpAsyncClient {
 	 * request text or image-based interactions and optionally include context from MCP
 	 * servers in their prompts.
 	 */
-	private Function<CreateMessageRequest, CreateMessageResult> samplingHandler;
+	private Function<CreateMessageRequest, Mono<CreateMessageResult>> samplingHandler;
 
 	/**
 	 * Client transport implementation.
 	 */
 	private final McpTransport transport;
+
+	/**
+	 * Create a new McpAsyncClient with the given transport and session request-response
+	 * timeout.
+	 * @param transport the transport to use.
+	 * @param requestTimeout the session request-response timeout.
+	 * @param features the MCP Client supported features.
+	 */
+	McpAsyncClient(ClientMcpTransport transport, Duration requestTimeout, McpClientFeatures.Async features) {
+
+		Assert.notNull(transport, "Transport must not be null");
+		Assert.notNull(requestTimeout, "Request timeout must not be null");
+
+		this.clientInfo = features.clientInfo();
+		this.clientCapabilities = features.clientCapabilities();
+		this.transport = transport;
+		this.roots = new ConcurrentHashMap<>(features.roots());
+
+		// Request Handlers
+		Map<String, RequestHandler<?>> requestHandlers = new HashMap<>();
+
+		// Roots List Request Handler
+		if (this.clientCapabilities.roots() != null) {
+			requestHandlers.put(McpSchema.METHOD_ROOTS_LIST, rootsListRequestHandler());
+		}
+
+		// Sampling Handler
+		if (this.clientCapabilities.sampling() != null) {
+			if (features.samplingHandler() == null) {
+				throw new McpError("Sampling handler must not be null when client capabilities include sampling");
+			}
+			this.samplingHandler = features.samplingHandler();
+			requestHandlers.put(McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, samplingCreateMessageHandler());
+		}
+
+		// Notification Handlers
+		Map<String, NotificationHandler> notificationHandlers = new HashMap<>();
+
+		// Tools Change Notification
+		List<Function<List<McpSchema.Tool>, Mono<Void>>> toolsChangeConsumersFinal = new ArrayList<>();
+		toolsChangeConsumersFinal
+			.add((notification) -> Mono.fromRunnable(() -> logger.info("Tools changed: {}", notification)));
+
+		if (!Utils.isEmpty(features.toolsChangeConsumers())) {
+			toolsChangeConsumersFinal.addAll(features.toolsChangeConsumers());
+		}
+		notificationHandlers.put(McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED,
+				asyncToolsChangeNotificationHandler(toolsChangeConsumersFinal));
+
+		// Resources Change Notification
+		List<Function<List<McpSchema.Resource>, Mono<Void>>> resourcesChangeConsumersFinal = new ArrayList<>();
+		resourcesChangeConsumersFinal
+			.add((notification) -> Mono.fromRunnable(() -> logger.info("Resources changed: {}", notification)));
+
+		if (!Utils.isEmpty(features.resourcesChangeConsumers())) {
+			resourcesChangeConsumersFinal.addAll(features.resourcesChangeConsumers());
+		}
+
+		notificationHandlers.put(McpSchema.METHOD_NOTIFICATION_RESOURCES_LIST_CHANGED,
+				asyncResourcesChangeNotificationHandler(resourcesChangeConsumersFinal));
+
+		// Prompts Change Notification
+		List<Function<List<McpSchema.Prompt>, Mono<Void>>> promptsChangeConsumersFinal = new ArrayList<>();
+		promptsChangeConsumersFinal
+			.add((notification) -> Mono.fromRunnable(() -> logger.info("Prompts changed: {}", notification)));
+		if (!Utils.isEmpty(features.promptsChangeConsumers())) {
+			promptsChangeConsumersFinal.addAll(features.promptsChangeConsumers());
+		}
+		notificationHandlers.put(McpSchema.METHOD_NOTIFICATION_PROMPTS_LIST_CHANGED,
+				asyncPromptsChangeNotificationHandler(promptsChangeConsumersFinal));
+
+		// Utility Logging Notification
+		List<Function<LoggingMessageNotification, Mono<Void>>> loggingConsumersFinal = new ArrayList<>();
+		loggingConsumersFinal.add((notification) -> Mono.fromRunnable(() -> logger.info("Logging: {}", notification)));
+		if (!Utils.isEmpty(features.loggingConsumers())) {
+			loggingConsumersFinal.addAll(features.loggingConsumers());
+		}
+		notificationHandlers.put(McpSchema.METHOD_NOTIFICATION_MESSAGE,
+				asyncLoggingNotificationHandler(loggingConsumersFinal));
+
+		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHandlers, notificationHandlers);
+
+	}
 
 	/**
 	 * Create a new McpAsyncClient with the given transport and session request-response
@@ -129,7 +213,9 @@ public class McpAsyncClient {
 	 * @param promptsChangeConsumers the prompts change consumers.
 	 * @param loggingConsumers the logging consumers.
 	 * @param samplingHandler the sampling handler.
+	 * @deprecated Use {@link McpClient#async(ClientMcpTransport)} to obtain an instance.
 	 */
+	@Deprecated
 	public McpAsyncClient(ClientMcpTransport transport, Duration requestTimeout, Implementation clientInfo,
 			ClientCapabilities clientCapabilities, Map<String, Root> roots,
 			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers,
@@ -153,11 +239,11 @@ public class McpAsyncClient {
 		this.roots = roots != null ? new ConcurrentHashMap<>(roots) : new ConcurrentHashMap<>();
 
 		// Request Handlers
-		Map<String, RequestHandler> requestHanlers = new HashMap<>();
+		Map<String, RequestHandler<?>> requestHandlers = new HashMap<>();
 
 		// Roots List Request Handler
-		if (this.roots != null && this.clientCapabilities.roots() != null) {
-			requestHanlers.put(McpSchema.METHOD_ROOTS_LIST, rootsListRequestHandler());
+		if (this.clientCapabilities.roots() != null) {
+			requestHandlers.put(McpSchema.METHOD_ROOTS_LIST, rootsListRequestHandler());
 		}
 
 		// Sampling Handler
@@ -165,8 +251,9 @@ public class McpAsyncClient {
 			if (samplingHandler == null) {
 				throw new McpError("Sampling handler must not be null when client capabilities include sampling");
 			}
-			this.samplingHandler = samplingHandler;
-			requestHanlers.put(McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, samplingCreateMessageHandler());
+			this.samplingHandler = r -> Mono.fromCallable(() -> samplingHandler.apply(r))
+				.subscribeOn(Schedulers.boundedElastic());
+			requestHandlers.put(McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, samplingCreateMessageHandler());
 		}
 
 		// Notification Handlers
@@ -208,7 +295,7 @@ public class McpAsyncClient {
 		notificationHandlers.put(McpSchema.METHOD_NOTIFICATION_MESSAGE,
 				loggingNotificationHandler(loggingConsumersFinal));
 
-		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHanlers, notificationHandlers);
+		this.mcpSession = new DefaultMcpSession(requestTimeout, transport, requestHandlers, notificationHandlers);
 
 	}
 
@@ -416,15 +503,13 @@ public class McpAsyncClient {
 	// --------------------------
 	// Sampling
 	// --------------------------
-	private RequestHandler samplingCreateMessageHandler() {
+	private RequestHandler<CreateMessageResult> samplingCreateMessageHandler() {
 		return params -> {
 			McpSchema.CreateMessageRequest request = transport.unmarshalFrom(params,
 					new TypeReference<McpSchema.CreateMessageRequest>() {
 					});
 
-			CreateMessageResult response = this.samplingHandler.apply(request);
-
-			return Mono.just(response);
+			return this.samplingHandler.apply(request);
 		};
 	}
 
@@ -498,6 +583,26 @@ public class McpAsyncClient {
 			logger.error("Error handling tools list change notification", error);
 			return Mono.empty();
 		}).then(); // Convert to Mono<Void>
+	}
+
+	/**
+	 * Creates a notification handler for tools/list_changed notifications from the
+	 * server. When the server's available tools change, it sends a notification to inform
+	 * connected clients. This handler automatically fetches the updated tool list and
+	 * distributes it to all registered consumers.
+	 * @param toolsChangeConsumers List of consumers that will be notified when the tools
+	 * list changes. Each consumer receives the complete updated list of tools.
+	 * @return A NotificationHandler that processes tools/list_changed notifications by:
+	 * 1. Fetching the current list of tools from the server 2. Distributing the updated
+	 * list to all registered consumers 3. Handling any errors that occur during this
+	 * process
+	 */
+	private NotificationHandler asyncToolsChangeNotificationHandler(
+			List<Function<List<McpSchema.Tool>, Mono<Void>>> toolsChangeConsumers) {
+		// TODO: params are not used yet
+		return params -> listTools().flatMap(listToolsResult -> Flux.fromIterable(toolsChangeConsumers)
+			.flatMap(consumer -> consumer.apply(listToolsResult.tools()))
+			.then());
 	}
 
 	// --------------------------
@@ -621,6 +726,13 @@ public class McpAsyncClient {
 		}).then();
 	}
 
+	private NotificationHandler asyncResourcesChangeNotificationHandler(
+			List<Function<List<McpSchema.Resource>, Mono<Void>>> resourcesChangeConsumers) {
+		return params -> listResources().flatMap(listResourcesResult -> Flux.fromIterable(resourcesChangeConsumers)
+			.flatMap(consumer -> consumer.apply(listResourcesResult.resources()))
+			.then());
+	}
+
 	// --------------------------
 	// Prompts
 	// --------------------------
@@ -682,6 +794,13 @@ public class McpAsyncClient {
 		}; // @formatter:on
 	}
 
+	private NotificationHandler asyncPromptsChangeNotificationHandler(
+			List<Function<List<McpSchema.Prompt>, Mono<Void>>> promptsChangeConsumers) {
+		return params -> listPrompts().flatMap(listPromptsResult -> Flux.fromIterable(promptsChangeConsumers)
+			.flatMap(consumer -> consumer.apply(listPromptsResult.prompts()))
+			.then());
+	}
+
 	// --------------------------
 	// Logging
 	// --------------------------
@@ -708,6 +827,28 @@ public class McpAsyncClient {
 				}
 			}).subscribeOn(Schedulers.boundedElastic()).then();
 
+		};
+	}
+
+	/**
+	 * Create a notification handler for logging notifications from the server. This
+	 * handler automatically distributes logging messages to all registered consumers.
+	 * @param loggingConsumers List of consumers that will be notified when a logging
+	 * message is received. Each consumer receives the logging message notification.
+	 * @return A NotificationHandler that processes log notifications by distributing the
+	 * message to all registered consumers
+	 */
+	private NotificationHandler asyncLoggingNotificationHandler(
+			List<Function<LoggingMessageNotification, Mono<Void>>> loggingConsumers) {
+
+		return params -> {
+			McpSchema.LoggingMessageNotification loggingMessageNotification = transport.unmarshalFrom(params,
+					new TypeReference<McpSchema.LoggingMessageNotification>() {
+					});
+
+			return Flux.fromIterable(loggingConsumers)
+				.flatMap(consumer -> consumer.apply(loggingMessageNotification))
+				.then();
 		};
 	}
 

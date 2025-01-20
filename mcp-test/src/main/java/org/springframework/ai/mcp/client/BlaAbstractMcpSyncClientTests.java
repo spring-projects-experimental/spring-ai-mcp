@@ -72,10 +72,10 @@ public abstract class BlaAbstractMcpSyncClientTests {
 		this.mcpTransport = createMcpTransport();
 
 		assertThatCode(() -> {
-			mcpSyncClient = McpClient.using(mcpTransport)
+			mcpSyncClient = McpClient.sync(mcpTransport)
 				.requestTimeout(TIMEOUT)
 				.capabilities(ClientCapabilities.builder().roots(true).build())
-				.sync();
+				.build();
 			mcpSyncClient.initialize();
 		}).doesNotThrowAnyException();
 	}
@@ -90,10 +90,10 @@ public abstract class BlaAbstractMcpSyncClientTests {
 
 	@Test
 	void testConstructorWithInvalidArguments() {
-		assertThatThrownBy(() -> McpClient.using(null).sync()).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> McpClient.sync(null).build()).isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Transport must not be null");
 
-		assertThatThrownBy(() -> McpClient.using(mcpTransport).requestTimeout(null).sync())
+		assertThatThrownBy(() -> McpClient.sync(mcpTransport).requestTimeout(null).build())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Request timeout must not be null");
 	}
@@ -180,10 +180,10 @@ public abstract class BlaAbstractMcpSyncClientTests {
 	void testInitializeWithRootsListProviders() {
 		var transport = createMcpTransport();
 
-		var client = McpClient.using(transport)
+		var client = McpClient.sync(transport)
 			.requestTimeout(TIMEOUT)
 			.roots(new Root("file:///test/path", "test-root"))
-			.sync();
+			.build();
 
 		assertThatCode(() -> {
 			client.initialize();
@@ -262,12 +262,12 @@ public abstract class BlaAbstractMcpSyncClientTests {
 		AtomicBoolean promptsNotificationReceived = new AtomicBoolean(false);
 
 		var transport = createMcpTransport();
-		var client = McpClient.using(transport)
+		var client = McpClient.sync(transport)
 			.requestTimeout(TIMEOUT)
 			.toolsChangeConsumer(tools -> toolsNotificationReceived.set(true))
 			.resourcesChangeConsumer(resources -> resourcesNotificationReceived.set(true))
 			.promptsChangeConsumer(prompts -> promptsNotificationReceived.set(true))
-			.sync();
+			.build();
 
 		assertThatCode(() -> {
 			client.initialize();
@@ -295,10 +295,10 @@ public abstract class BlaAbstractMcpSyncClientTests {
 		AtomicBoolean logReceived = new AtomicBoolean(false);
 		var transport = createMcpTransport();
 
-		var client = McpClient.using(transport)
+		var client = McpClient.sync(transport)
 			.requestTimeout(TIMEOUT)
 			.loggingConsumer(notification -> logReceived.set(true))
-			.sync();
+			.build();
 
 		assertThatCode(() -> {
 			client.initialize();
