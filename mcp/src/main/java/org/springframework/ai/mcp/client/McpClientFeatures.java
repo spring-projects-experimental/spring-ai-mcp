@@ -16,7 +16,9 @@ import org.springframework.ai.mcp.util.Assert;
 import org.springframework.ai.mcp.util.Utils;
 
 /**
- * Internal representation of features that the client exposes.
+ * Representation of features that the client exposes.
+ *
+ * @author Dariusz Jędrzejczyk
  */
 class McpClientFeatures {
 
@@ -68,10 +70,10 @@ class McpClientFeatures {
 							samplingHandler != null ? new McpSchema.ClientCapabilities.Sampling() : null);
 			this.roots = roots != null ? new ConcurrentHashMap<>(roots) : new ConcurrentHashMap<>();
 
-			this.toolsChangeConsumers = toolsChangeConsumers;
-			this.resourcesChangeConsumers = resourcesChangeConsumers;
-			this.promptsChangeConsumers = promptsChangeConsumers;
-			this.loggingConsumers = loggingConsumers;
+			this.toolsChangeConsumers = toolsChangeConsumers != null ? toolsChangeConsumers : List.of();
+			this.resourcesChangeConsumers = resourcesChangeConsumers != null ? resourcesChangeConsumers : List.of();
+			this.promptsChangeConsumers = promptsChangeConsumers != null ? promptsChangeConsumers : List.of();
+			this.loggingConsumers = loggingConsumers != null ? loggingConsumers : List.of();
 			this.samplingHandler = samplingHandler;
 		}
 
@@ -165,10 +167,10 @@ class McpClientFeatures {
 							samplingHandler != null ? new McpSchema.ClientCapabilities.Sampling() : null);
 			this.roots = roots != null ? new HashMap<>(roots) : new HashMap<>();
 
-			this.toolsChangeConsumers = toolsChangeConsumers;
-			this.resourcesChangeConsumers = resourcesChangeConsumers;
-			this.promptsChangeConsumers = promptsChangeConsumers;
-			this.loggingConsumers = loggingConsumers;
+			this.toolsChangeConsumers = toolsChangeConsumers != null ? toolsChangeConsumers : List.of();
+			this.resourcesChangeConsumers = resourcesChangeConsumers != null ? resourcesChangeConsumers : List.of();
+			this.promptsChangeConsumers = promptsChangeConsumers != null ? promptsChangeConsumers : List.of();
+			this.loggingConsumers = loggingConsumers != null ? loggingConsumers : List.of();
 			this.samplingHandler = samplingHandler;
 		}
 	}

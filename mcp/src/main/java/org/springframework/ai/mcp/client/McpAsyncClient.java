@@ -488,7 +488,7 @@ public class McpAsyncClient {
 		return this.mcpSession.sendNotification(McpSchema.METHOD_NOTIFICATION_ROOTS_LIST_CHANGED);
 	}
 
-	private RequestHandler rootsListRequestHandler() {
+	private RequestHandler<McpSchema.ListRootsResult> rootsListRequestHandler() {
 		return params -> {
 			McpSchema.PaginatedRequest request = transport.unmarshalFrom(params,
 					new TypeReference<McpSchema.PaginatedRequest>() {
@@ -516,10 +516,10 @@ public class McpAsyncClient {
 	// --------------------------
 	// Tools
 	// --------------------------
-	private static TypeReference<McpSchema.CallToolResult> CALL_TOOL_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.CallToolResult> CALL_TOOL_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
-	private static TypeReference<McpSchema.ListToolsResult> LIST_TOOLS_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.ListToolsResult> LIST_TOOLS_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
 	/**
@@ -572,6 +572,7 @@ public class McpAsyncClient {
 	 * list to all registered consumers 3. Handling any errors that occur during this
 	 * process
 	 */
+	@Deprecated
 	private NotificationHandler toolsChangeNotificationHandler(
 			List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers) {
 
@@ -602,6 +603,10 @@ public class McpAsyncClient {
 		// TODO: params are not used yet
 		return params -> listTools().flatMap(listToolsResult -> Flux.fromIterable(toolsChangeConsumers)
 			.flatMap(consumer -> consumer.apply(listToolsResult.tools()))
+			.onErrorResume(error -> {
+				logger.error("Error handling tools list change notification", error);
+				return Mono.empty();
+			})
 			.then());
 	}
 
@@ -609,13 +614,13 @@ public class McpAsyncClient {
 	// Resources
 	// --------------------------
 
-	private static TypeReference<McpSchema.ListResourcesResult> LIST_RESOURCES_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.ListResourcesResult> LIST_RESOURCES_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
-	private static TypeReference<McpSchema.ReadResourceResult> READ_RESOURCE_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.ReadResourceResult> READ_RESOURCE_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
-	private static TypeReference<McpSchema.ListResourceTemplatesResult> LIST_RESOURCE_TEMPLATES_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.ListResourceTemplatesResult> LIST_RESOURCE_TEMPLATES_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
 	/**
@@ -713,6 +718,7 @@ public class McpAsyncClient {
 				VOID_TYPE_REFERENCE);
 	}
 
+	@Deprecated
 	private NotificationHandler resourcesChangeNotificationHandler(
 			List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers) {
 
@@ -730,16 +736,20 @@ public class McpAsyncClient {
 			List<Function<List<McpSchema.Resource>, Mono<Void>>> resourcesChangeConsumers) {
 		return params -> listResources().flatMap(listResourcesResult -> Flux.fromIterable(resourcesChangeConsumers)
 			.flatMap(consumer -> consumer.apply(listResourcesResult.resources()))
+			.onErrorResume(error -> {
+				logger.error("Error handling resources list change notification", error);
+				return Mono.empty();
+			})
 			.then());
 	}
 
 	// --------------------------
 	// Prompts
 	// --------------------------
-	private static TypeReference<McpSchema.ListPromptsResult> LIST_PROMPTS_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.ListPromptsResult> LIST_PROMPTS_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
-	private static TypeReference<McpSchema.GetPromptResult> GET_PROMPT_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.GetPromptResult> GET_PROMPT_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
 	/**
@@ -779,6 +789,7 @@ public class McpAsyncClient {
 		return this.mcpSession.sendNotification(McpSchema.METHOD_NOTIFICATION_PROMPTS_LIST_CHANGED);
 	}
 
+	@Deprecated
 	private NotificationHandler promptsChangeNotificationHandler(
 			List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers) {
 
@@ -798,6 +809,10 @@ public class McpAsyncClient {
 			List<Function<List<McpSchema.Prompt>, Mono<Void>>> promptsChangeConsumers) {
 		return params -> listPrompts().flatMap(listPromptsResult -> Flux.fromIterable(promptsChangeConsumers)
 			.flatMap(consumer -> consumer.apply(listPromptsResult.prompts()))
+			.onErrorResume(error -> {
+				logger.error("Error handling prompts list change notification", error);
+				return Mono.empty();
+			})
 			.then());
 	}
 
