@@ -60,6 +60,7 @@ import org.springframework.ai.mcp.util.Assert;
  * connected clients of changes when configured to do so.
  *
  * @author Christian Tzolov
+ * @author Dariusz Jędrzejczyk
  * @see McpAsyncServer
  * @see McpSchema
  */

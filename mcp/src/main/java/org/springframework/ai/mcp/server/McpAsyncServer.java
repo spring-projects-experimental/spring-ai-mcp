@@ -84,6 +84,7 @@ import org.springframework.ai.mcp.util.Utils;
  * connected clients of changes when configured to do so.
  *
  * @author Christian Tzolov
+ * @author Dariusz Jędrzejczyk
  * @see McpServer
  * @see McpSchema
  * @see DefaultMcpSession
@@ -137,7 +138,7 @@ public class McpAsyncServer {
 		Map<String, DefaultMcpSession.RequestHandler<?>> requestHandlers = new HashMap<>();
 
 		// Initialize request handlers for standard MCP methods
-		requestHandlers.put(McpSchema.METHOD_INITIALIZE, initializeRequestHandler());
+		requestHandlers.put(McpSchema.METHOD_INITIALIZE, asyncInitializeRequestHandler());
 
 		// Ping MUST respond with an empty data, but not NULL response.
 		requestHandlers.put(McpSchema.METHOD_PING, (params) -> Mono.just(""));
@@ -287,6 +288,28 @@ public class McpAsyncServer {
 	// ---------------------------------------
 	// Lifecycle Management
 	// ---------------------------------------
+	private DefaultMcpSession.RequestHandler<McpSchema.InitializeResult> asyncInitializeRequestHandler() {
+		return params -> {
+			McpSchema.InitializeRequest initializeRequest = transport.unmarshalFrom(params,
+					new TypeReference<McpSchema.InitializeRequest>() {
+					});
+			this.clientCapabilities = initializeRequest.capabilities();
+			this.clientInfo = initializeRequest.clientInfo();
+			logger.info("Client initialize request - Protocol: {}, Capabilities: {}, Info: {}",
+					initializeRequest.protocolVersion(), initializeRequest.capabilities(),
+					initializeRequest.clientInfo());
+
+			if (!McpSchema.LATEST_PROTOCOL_VERSION.equals(initializeRequest.protocolVersion())) {
+				return Mono.error(new McpError(
+						"Unsupported protocol version from client: " + initializeRequest.protocolVersion()));
+			}
+
+			return Mono.just(new McpSchema.InitializeResult(McpSchema.LATEST_PROTOCOL_VERSION, this.serverCapabilities,
+					this.serverInfo, null));
+		};
+	}
+
+	@Deprecated
 	private DefaultMcpSession.RequestHandler<McpSchema.InitializeResult> initializeRequestHandler() {
 		return params -> {
 			McpSchema.InitializeRequest initializeRequest = transport.unmarshalFrom(params,
@@ -360,7 +383,7 @@ public class McpAsyncServer {
 		this.mcpSession.close();
 	}
 
-	private static TypeReference<McpSchema.ListRootsResult> LIST_ROOTS_RESULT_TYPE_REF = new TypeReference<>() {
+	private static final TypeReference<McpSchema.ListRootsResult> LIST_ROOTS_RESULT_TYPE_REF = new TypeReference<>() {
 	};
 
 	/**
@@ -399,6 +422,10 @@ public class McpAsyncServer {
 			List<Function<List<McpSchema.Root>, Mono<Void>>> rootsChangeConsumers) {
 		return params -> listRoots().flatMap(listRootsResult -> Flux.fromIterable(rootsChangeConsumers)
 			.flatMap(consumer -> consumer.apply(listRootsResult.roots()))
+			.onErrorResume(error -> {
+				logger.error("Error handling roots list change notification", error);
+				return Mono.empty();
+			})
 			.then());
 	}
 
@@ -654,7 +681,7 @@ public class McpAsyncServer {
 			var resourceUri = resourceRequest.uri();
 			McpServerFeatures.AsyncResourceRegistration registration = this.resources.get(resourceUri);
 			if (registration != null) {
-				return this.resources.get(resourceUri).readHandler().apply(resourceRequest);
+				return registration.readHandler().apply(resourceRequest);
 			}
 			return Mono.error(new McpError("Resource not found: " + resourceUri));
 		};

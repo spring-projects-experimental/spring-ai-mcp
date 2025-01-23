@@ -16,6 +16,8 @@ import org.springframework.ai.mcp.util.Utils;
 
 /**
  * MCP server features specification that a particular server can choose to support.
+ *
+ * @author Dariusz Jędrzejczyk
  */
 public class McpServerFeatures {
 

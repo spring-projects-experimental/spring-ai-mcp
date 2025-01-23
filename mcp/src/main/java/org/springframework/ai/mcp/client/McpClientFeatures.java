@@ -16,8 +16,8 @@ import org.springframework.ai.mcp.util.Assert;
 import org.springframework.ai.mcp.util.Utils;
 
 /**
- * Internal representation of features and capabilities for Model Context Protocol (MCP)
- * clients. This class provides two record types for managing client features:
+ * Representation of features and capabilities for Model Context Protocol (MCP) clients.
+ * This class provides two record types for managing client features:
  * <ul>
  * <li>{@link Async} for non-blocking operations with Project Reactor's Mono responses
  * <li>{@link Sync} for blocking operations with direct responses
@@ -38,6 +38,7 @@ import org.springframework.ai.mcp.util.Utils;
  * through the {@link Async#fromSync} method, which ensures proper handling of blocking
  * operations in non-blocking contexts by scheduling them on a bounded elastic scheduler.
  *
+ * @author Dariusz Jędrzejczyk
  * @see McpClient
  * @see McpSchema.Implementation
  * @see McpSchema.ClientCapabilities
@@ -92,10 +93,10 @@ class McpClientFeatures {
 							samplingHandler != null ? new McpSchema.ClientCapabilities.Sampling() : null);
 			this.roots = roots != null ? new ConcurrentHashMap<>(roots) : new ConcurrentHashMap<>();
 
-			this.toolsChangeConsumers = toolsChangeConsumers;
-			this.resourcesChangeConsumers = resourcesChangeConsumers;
-			this.promptsChangeConsumers = promptsChangeConsumers;
-			this.loggingConsumers = loggingConsumers;
+			this.toolsChangeConsumers = toolsChangeConsumers != null ? toolsChangeConsumers : List.of();
+			this.resourcesChangeConsumers = resourcesChangeConsumers != null ? resourcesChangeConsumers : List.of();
+			this.promptsChangeConsumers = promptsChangeConsumers != null ? promptsChangeConsumers : List.of();
+			this.loggingConsumers = loggingConsumers != null ? loggingConsumers : List.of();
 			this.samplingHandler = samplingHandler;
 		}
 
@@ -189,10 +190,10 @@ class McpClientFeatures {
 							samplingHandler != null ? new McpSchema.ClientCapabilities.Sampling() : null);
 			this.roots = roots != null ? new HashMap<>(roots) : new HashMap<>();
 
-			this.toolsChangeConsumers = toolsChangeConsumers;
-			this.resourcesChangeConsumers = resourcesChangeConsumers;
-			this.promptsChangeConsumers = promptsChangeConsumers;
-			this.loggingConsumers = loggingConsumers;
+			this.toolsChangeConsumers = toolsChangeConsumers != null ? toolsChangeConsumers : List.of();
+			this.resourcesChangeConsumers = resourcesChangeConsumers != null ? resourcesChangeConsumers : List.of();
+			this.promptsChangeConsumers = promptsChangeConsumers != null ? promptsChangeConsumers : List.of();
+			this.loggingConsumers = loggingConsumers != null ? loggingConsumers : List.of();
 			this.samplingHandler = samplingHandler;
 		}
 	}

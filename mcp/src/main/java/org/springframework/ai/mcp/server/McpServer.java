@@ -120,11 +120,36 @@ import org.springframework.ai.mcp.util.Assert;
  * }</pre>
  *
  * @author Christian Tzolov
+ * @author Dariusz Jędrzejczyk
  * @see McpAsyncServer
  * @see McpSyncServer
  * @see McpTransport
  */
 public interface McpServer {
+
+	/**
+	 * Starts building a synchronous MCP server that provides blocking operations.
+	 * Synchronous servers process each request to completion before handling the next
+	 * one, making them simpler to implement but potentially less performant for
+	 * concurrent operations.
+	 * @param transport The transport layer implementation for MCP communication
+	 * @return A new instance of {@link SyncSpec} for configuring the server.
+	 */
+	static SyncSpec sync(ServerMcpTransport transport) {
+		return new SyncSpec(transport);
+	}
+
+	/**
+	 * Starts building an asynchronous MCP server that provides blocking operations.
+	 * Asynchronous servers can handle multiple requests concurrently using a functional
+	 * paradigm with non-blocking server transports, making them more efficient for
+	 * high-concurrency scenarios but more complex to implement.
+	 * @param transport The transport layer implementation for MCP communication
+	 * @return A new instance of {@link SyncSpec} for configuring the server.
+	 */
+	static AsyncSpec async(ServerMcpTransport transport) {
+		return new AsyncSpec(transport);
+	}
 
 	/**
 	 * Start building an MCP server with the specified transport.
@@ -170,7 +195,7 @@ public interface McpServer {
 		 */
 		private final Map<String, McpServerFeatures.AsyncResourceRegistration> resources = new HashMap<>();
 
-		private List<ResourceTemplate> resourceTemplates = new ArrayList<>();
+		private final List<ResourceTemplate> resourceTemplates = new ArrayList<>();
 
 		/**
 		 * The Model Context Protocol (MCP) provides a standardized way for servers to
@@ -547,7 +572,7 @@ public interface McpServer {
 		 */
 		private final Map<String, McpServerFeatures.SyncResourceRegistration> resources = new HashMap<>();
 
-		private List<ResourceTemplate> resourceTemplates = new ArrayList<>();
+		private final List<ResourceTemplate> resourceTemplates = new ArrayList<>();
 
 		/**
 		 * The Model Context Protocol (MCP) provides a standardized way for servers to
@@ -556,9 +581,9 @@ public interface McpServer {
 		 * discover available prompts, retrieve their contents, and provide arguments to
 		 * customize them.
 		 */
-		private Map<String, McpServerFeatures.SyncPromptRegistration> prompts = new HashMap<>();
+		private final Map<String, McpServerFeatures.SyncPromptRegistration> prompts = new HashMap<>();
 
-		private List<Consumer<List<McpSchema.Root>>> rootsChangeConsumers = new ArrayList<>();
+		private final List<Consumer<List<McpSchema.Root>>> rootsChangeConsumers = new ArrayList<>();
 
 		private SyncSpec(ServerMcpTransport transport) {
 			Assert.notNull(transport, "Transport must not be null");
@@ -893,28 +918,6 @@ public interface McpServer {
 					new McpAsyncServer(this.transport, McpServerFeatures.Async.fromSync(syncFeatures)));
 		}
 
-	}
-
-	/**
-	 * Builds a synchronous MCP server that provides blocking operations. Synchronous
-	 * servers process each request to completion before handling the next one, making
-	 * them simpler to implement but potentially less performant for concurrent
-	 * operations.
-	 * @return A new instance of {@link SyncSpec} for configuring the server.
-	 */
-	static SyncSpec sync(ServerMcpTransport transport) {
-		return new SyncSpec(transport);
-	}
-
-	/**
-	 * Builds an asynchronous MCP server that provides non-blocking operations.
-	 * Asynchronous servers can handle multiple requests concurrently using a functional
-	 * paradigm with non-blocking server transports, making them more efficient for
-	 * high-concurrency scenarios but more complex to implement.
-	 * @return A new instance of {@link SyncSpec} for configuring the server.
-	 */
-	static AsyncSpec async(ServerMcpTransport transport) {
-		return new AsyncSpec(transport);
 	}
 
 	/**

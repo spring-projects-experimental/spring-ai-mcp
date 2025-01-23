@@ -21,6 +21,7 @@ import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.ai.mcp.spec.ClientMcpTransport;
 import org.springframework.ai.mcp.spec.McpSchema;
 import org.springframework.ai.mcp.spec.McpSchema.ClientCapabilities;
 import org.springframework.ai.mcp.spec.McpSchema.GetPromptRequest;
@@ -74,6 +75,14 @@ public class McpSyncClient implements AutoCloseable {
 
 	private final McpAsyncClient delegate;
 
+	/**
+	 * Create a new McpSyncClient with the given delegate.
+	 * @param delegate the asynchronous kernel on top of which this synchronous client
+	 * provides a blocking API.
+	 * @deprecated Use {@link McpClient#sync(ClientMcpTransport)} to obtain an instance.
+	 */
+	@Deprecated
+	// TODO make the constructor package private post-deprecation
 	public McpSyncClient(McpAsyncClient delegate) {
 		Assert.notNull(delegate, "The delegate can not be null");
 		this.delegate = delegate;

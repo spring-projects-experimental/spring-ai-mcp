@@ -65,7 +65,7 @@ import org.springframework.ai.mcp.util.Assert;
  *     .requestTimeout(Duration.ofSeconds(5))
  *     .build();
  * }</pre>
- * 
+ *
  * Example of creating a basic asynchronous client: <pre>{@code
  * McpClient.async(transport)
  *     .requestTimeout(Duration.ofSeconds(5))
@@ -113,6 +113,40 @@ import org.springframework.ai.mcp.util.Assert;
  * @see McpTransport
  */
 public interface McpClient {
+
+	/**
+	 * Start building a synchronous MCP client with the specified transport layer. The
+	 * synchronous MCP client provides blocking operations. Synchronous clients wait for
+	 * each operation to complete before returning, making them simpler to use but
+	 * potentially less performant for concurrent operations. The transport layer handles
+	 * the low-level communication between client and server using protocols like stdio or
+	 * Server-Sent Events (SSE).
+	 * @param transport The transport layer implementation for MCP communication. Common
+	 * implementations include {@code StdioClientTransport} for stdio-based communication
+	 * and {@code SseClientTransport} for SSE-based communication.
+	 * @return A new builder instance for configuring the client
+	 * @throws IllegalArgumentException if transport is null
+	 */
+	static SyncSpec sync(ClientMcpTransport transport) {
+		return new SyncSpec(transport);
+	}
+
+	/**
+	 * Start building an asynchronous MCP client with the specified transport layer. The
+	 * asynchronous MCP client provides non-blocking operations. Asynchronous clients
+	 * return reactive primitives (Mono/Flux) immediately, allowing for concurrent
+	 * operations and reactive programming patterns. The transport layer handles the
+	 * low-level communication between client and server using protocols like stdio or
+	 * Server-Sent Events (SSE).
+	 * @param transport The transport layer implementation for MCP communication. Common
+	 * implementations include {@code StdioClientTransport} for stdio-based communication
+	 * and {@code SseClientTransport} for SSE-based communication.
+	 * @return A new builder instance for configuring the client
+	 * @throws IllegalArgumentException if transport is null
+	 */
+	static AsyncSpec async(ClientMcpTransport transport) {
+		return new AsyncSpec(transport);
+	}
 
 	/**
 	 * Start building an MCP client with the specified transport layer. The transport
@@ -371,7 +405,20 @@ public interface McpClient {
 	}
 
 	/**
-	 * Synchronous client specification.
+	 * Synchronous client specification. This class follows the builder pattern to provide
+	 * a fluent API for setting up clients with custom configurations.
+	 *
+	 * <p>
+	 * The builder supports configuration of:
+	 * <ul>
+	 * <li>Transport layer for client-server communication
+	 * <li>Request timeouts for operation boundaries
+	 * <li>Client capabilities for feature negotiation
+	 * <li>Client implementation details for version tracking
+	 * <li>Root URIs for resource access
+	 * <li>Change notification handlers for tools, resources, and prompts
+	 * <li>Custom message sampling logic
+	 * </ul>
 	 */
 	class SyncSpec {
 
@@ -381,21 +428,22 @@ public interface McpClient {
 
 		private ClientCapabilities capabilities;
 
-		private Implementation clientInfo = new Implementation("Spring AI MCP Client", "0.3.1");
+		private Implementation clientInfo = new Implementation("Spring AI MCP Client", "1.0.0");
 
-		private Map<String, Root> roots = new HashMap<>();
+		private final Map<String, Root> roots = new HashMap<>();
 
-		private List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = new ArrayList<>();
+		private final List<Consumer<List<McpSchema.Tool>>> toolsChangeConsumers = new ArrayList<>();
 
-		private List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers = new ArrayList<>();
+		private final List<Consumer<List<McpSchema.Resource>>> resourcesChangeConsumers = new ArrayList<>();
 
-		private List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers = new ArrayList<>();
+		private final List<Consumer<List<McpSchema.Prompt>>> promptsChangeConsumers = new ArrayList<>();
 
-		private List<Consumer<McpSchema.LoggingMessageNotification>> loggingConsumers = new ArrayList<>();
+		private final List<Consumer<McpSchema.LoggingMessageNotification>> loggingConsumers = new ArrayList<>();
 
 		private Function<CreateMessageRequest, CreateMessageResult> samplingHandler;
 
 		private SyncSpec(ClientMcpTransport transport) {
+			Assert.notNull(transport, "Transport must not be null");
 			this.transport = transport;
 		}
 
@@ -581,7 +629,20 @@ public interface McpClient {
 	}
 
 	/**
-	 * Asynchronous client specification.
+	 * Asynchronous client specification. This class follows the builder pattern to
+	 * provide a fluent API for setting up clients with custom configurations.
+	 *
+	 * <p>
+	 * The builder supports configuration of:
+	 * <ul>
+	 * <li>Transport layer for client-server communication
+	 * <li>Request timeouts for operation boundaries
+	 * <li>Client capabilities for feature negotiation
+	 * <li>Client implementation details for version tracking
+	 * <li>Root URIs for resource access
+	 * <li>Change notification handlers for tools, resources, and prompts
+	 * <li>Custom message sampling logic
+	 * </ul>
 	 */
 	class AsyncSpec {
 
@@ -593,19 +654,20 @@ public interface McpClient {
 
 		private Implementation clientInfo = new Implementation("Spring AI MCP Client", "0.3.1");
 
-		private Map<String, Root> roots = new HashMap<>();
+		private final Map<String, Root> roots = new HashMap<>();
 
-		private List<Function<List<McpSchema.Tool>, Mono<Void>>> toolsChangeConsumers = new ArrayList<>();
+		private final List<Function<List<McpSchema.Tool>, Mono<Void>>> toolsChangeConsumers = new ArrayList<>();
 
-		private List<Function<List<McpSchema.Resource>, Mono<Void>>> resourcesChangeConsumers = new ArrayList<>();
+		private final List<Function<List<McpSchema.Resource>, Mono<Void>>> resourcesChangeConsumers = new ArrayList<>();
 
-		private List<Function<List<McpSchema.Prompt>, Mono<Void>>> promptsChangeConsumers = new ArrayList<>();
+		private final List<Function<List<McpSchema.Prompt>, Mono<Void>>> promptsChangeConsumers = new ArrayList<>();
 
-		private List<Function<McpSchema.LoggingMessageNotification, Mono<Void>>> loggingConsumers = new ArrayList<>();
+		private final List<Function<McpSchema.LoggingMessageNotification, Mono<Void>>> loggingConsumers = new ArrayList<>();
 
 		private Function<CreateMessageRequest, Mono<CreateMessageResult>> samplingHandler;
 
 		private AsyncSpec(ClientMcpTransport transport) {
+			Assert.notNull(transport, "Transport must not be null");
 			this.transport = transport;
 		}
 
@@ -787,14 +849,6 @@ public interface McpClient {
 							this.loggingConsumers, this.samplingHandler));
 		}
 
-	}
-
-	static SyncSpec sync(ClientMcpTransport transport) {
-		return new SyncSpec(transport);
-	}
-
-	static AsyncSpec async(ClientMcpTransport transport) {
-		return new AsyncSpec(transport);
 	}
 
 }
