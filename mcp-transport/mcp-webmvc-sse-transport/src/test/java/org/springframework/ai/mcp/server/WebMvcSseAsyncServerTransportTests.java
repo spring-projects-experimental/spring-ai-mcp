@@ -33,7 +33,7 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 
 @Timeout(15)
-class WebMvcSseAsyncServerTransportTests extends BlaAbstractMcpAsyncServerTests {
+class WebMvcSseAsyncServerTransportTests extends AbstractMcpAsyncServerTests {
 
 	private static final String MESSAGE_ENDPOINT = "/mcp/message";
 

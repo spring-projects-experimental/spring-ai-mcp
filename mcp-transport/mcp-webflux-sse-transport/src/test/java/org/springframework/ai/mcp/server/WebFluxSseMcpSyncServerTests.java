@@ -33,7 +33,7 @@ import org.springframework.web.reactive.function.server.RouterFunctions;
  * @author Christian Tzolov
  */
 @Timeout(15) // Giving extra time beyond the client timeout
-class WebFluxSseMcpSyncServerTests extends BlaAbstractMcpSyncServerTests {
+class WebFluxSseMcpSyncServerTests extends AbstractMcpSyncServerTests {
 
 	private static final int PORT = 8182;
 

@@ -54,7 +54,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @author Christian Tzolov
  * @author Dariusz Jędrzejczyk
  */
-public abstract class BlaAbstractMcpAsyncClientTests {
+public abstract class AbstractMcpAsyncClientTests {
 
 	private McpAsyncClient mcpAsyncClient;
 

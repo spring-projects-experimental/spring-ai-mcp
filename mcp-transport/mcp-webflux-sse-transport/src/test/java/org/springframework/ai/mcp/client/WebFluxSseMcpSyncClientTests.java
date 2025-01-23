@@ -30,7 +30,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * @author Christian Tzolov
  */
 @Timeout(15) // Giving extra time beyond the client timeout
-class WebFluxSseMcpSyncClientTests extends BlaAbstractMcpSyncClientTests {
+class WebFluxSseMcpSyncClientTests extends AbstractMcpSyncClientTests {
 
 	static String host = "http://localhost:3001";
 

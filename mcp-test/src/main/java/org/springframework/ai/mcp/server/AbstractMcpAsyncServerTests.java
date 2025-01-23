@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @author Christian Tzolov
  */
-public abstract class BlaAbstractMcpAsyncServerTests {
+public abstract class AbstractMcpAsyncServerTests {
 
 	private static final String TEST_TOOL_NAME = "test-tool";
 

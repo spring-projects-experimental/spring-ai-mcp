@@ -17,7 +17,6 @@
 package org.springframework.ai.mcp.server;
 
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @author Christian Tzolov
  */
-public abstract class BlaAbstractMcpSyncServerTests {
+public abstract class AbstractMcpSyncServerTests {
 
 	private static final String TEST_TOOL_NAME = "test-tool";
 

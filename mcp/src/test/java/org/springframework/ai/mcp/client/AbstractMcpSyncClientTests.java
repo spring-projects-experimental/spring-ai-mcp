@@ -50,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @author Christian Tzolov
  * @author Dariusz Jędrzejczyk
  */
+// KEEP IN SYNC with the class in mcp-test module
 public abstract class AbstractMcpSyncClientTests {
 
 	private McpSyncClient mcpSyncClient;
