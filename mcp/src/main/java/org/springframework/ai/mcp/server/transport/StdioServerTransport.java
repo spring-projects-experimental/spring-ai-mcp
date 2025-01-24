@@ -118,6 +118,11 @@ public class StdioServerTransport implements ServerMcpTransport {
 			.flatMap(message -> Mono.just(message)
 				.transform(inboundMessageHandler)
 				.contextWrite(ctx -> ctx.put("observation", "myObservation")))
+			.doOnComplete(() -> {
+				this.outboundSink.tryEmitComplete();
+				this.inboundScheduler.dispose();
+				this.outboundScheduler.dispose();
+			})
 			.subscribe();
 	}
 
@@ -184,51 +189,51 @@ public class StdioServerTransport implements ServerMcpTransport {
 	 */
 	private void startOutboundProcessing() {
 		Function<Flux<JSONRPCMessage>, Flux<JSONRPCMessage>> outboundConsumer = messages -> messages // @formatter:off
-			.doOnSubscribe(subscription -> outboundReady.tryEmitValue(null))
-			.publishOn(outboundScheduler)
-			.handle((message, sink) -> {
-				if (message != null && !isClosing) {
-					try {
-						String jsonMessage = objectMapper.writeValueAsString(message);
-						// Escape any embedded newlines in the JSON message as per spec
-						jsonMessage = jsonMessage.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n");
+			 .doOnSubscribe(subscription -> outboundReady.tryEmitValue(null))
+			 .publishOn(outboundScheduler)
+			 .handle((message, sink) -> {
+				 if (message != null && !isClosing) {
+					 try {
+						 String jsonMessage = objectMapper.writeValueAsString(message);
+						 // Escape any embedded newlines in the JSON message as per spec
+						 jsonMessage = jsonMessage.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n");
 
-						synchronized (outputStream) {
-							outputStream.write(jsonMessage.getBytes(StandardCharsets.UTF_8));
-							outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
-							outputStream.flush();
-						}
-						sink.next(message);
-					}
-					catch (IOException e) {
-						if (!isClosing) {
-							logger.error("Error writing message", e);
-							sink.error(new RuntimeException(e));
-						}
-						else {
-							logger.debug("Stream closed during shutdown", e);
-						}
-					}
-				}
-				else if (isClosing) {
-					sink.complete();
-				}
-			})
-			.doOnComplete(() -> {
-				isClosing = true;
-				outboundSink.tryEmitComplete();
-			})
-			.doOnError(e -> {
-				if (!isClosing) {
-					logger.error("Error in outbound processing", e);
-					isClosing = true;
-					outboundSink.tryEmitComplete();
-				}
-			})
-			.map(msg -> (JSONRPCMessage) msg);
+						 synchronized (outputStream) {
+							 outputStream.write(jsonMessage.getBytes(StandardCharsets.UTF_8));
+							 outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
+							 outputStream.flush();
+						 }
+						 sink.next(message);
+					 }
+					 catch (IOException e) {
+						 if (!isClosing) {
+							 logger.error("Error writing message", e);
+							 sink.error(new RuntimeException(e));
+						 }
+						 else {
+							 logger.debug("Stream closed during shutdown", e);
+						 }
+					 }
+				 }
+				 else if (isClosing) {
+					 sink.complete();
+				 }
+			 })
+			 .doOnComplete(() -> {
+				 isClosing = true;
+				 outboundSink.tryEmitComplete();
+			 })
+			 .doOnError(e -> {
+				 if (!isClosing) {
+					 logger.error("Error in outbound processing", e);
+					 isClosing = true;
+					 outboundSink.tryEmitComplete();
+				 }
+			 })
+			 .map(msg -> (JSONRPCMessage) msg);
 
-			outboundConsumer.apply(outboundSink.asFlux()).subscribe();
-	} // @formatter:on
+			 outboundConsumer.apply(outboundSink.asFlux()).subscribe();
+	 } // @formatter:on
 
 	@Override
 	public Mono<Void> closeGracefully() {
