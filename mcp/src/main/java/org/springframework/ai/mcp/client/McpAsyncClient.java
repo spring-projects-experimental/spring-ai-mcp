@@ -147,6 +147,11 @@ public class McpAsyncClient {
 	private final McpTransport transport;
 
 	/**
+	 * Supported protocol versions.
+	 */
+	private List<String> protocolVersions = List.of(McpSchema.LATEST_PROTOCOL_VERSION);
+
+	/**
 	 * Create a new McpAsyncClient with the given transport and session request-response
 	 * timeout.
 	 * @param transport the transport to use.
@@ -257,6 +262,8 @@ public class McpAsyncClient {
 		Assert.notNull(requestTimeout, "Request timeout must not be null");
 		Assert.notNull(clientInfo, "Client info must not be null");
 
+		this.protocolVersions = List.of(McpSchema.LATEST_PROTOCOL_VERSION);
+
 		this.clientInfo = clientInfo;
 
 		this.clientCapabilities = (clientCapabilities != null) ? clientCapabilities
@@ -360,8 +367,11 @@ public class McpAsyncClient {
 	 * @return the initialize result.
 	 */
 	public Mono<McpSchema.InitializeResult> initialize() {
+
+		String latestVersion = this.protocolVersions.get(this.protocolVersions.size() - 1);
+
 		McpSchema.InitializeRequest initializeRequest = new McpSchema.InitializeRequest(// @formatter:off
-                McpSchema.LATEST_PROTOCOL_VERSION,
+				latestVersion,
                 this.clientCapabilities,
                 this.clientInfo); // @formatter:on
 
@@ -378,7 +388,7 @@ public class McpAsyncClient {
 					initializeResult.protocolVersion(), initializeResult.capabilities(), initializeResult.serverInfo(),
 					initializeResult.instructions());
 
-			if (!McpSchema.LATEST_PROTOCOL_VERSION.equals(initializeResult.protocolVersion())) {
+			if (!this.protocolVersions.contains(initializeResult.protocolVersion())) {
 				return Mono.error(new McpError(
 						"Unsupported protocol version from the server: " + initializeResult.protocolVersion()));
 			}
@@ -909,6 +919,15 @@ public class McpAsyncClient {
 		Map<String, Object> params = Map.of("level", levelName);
 
 		return this.mcpSession.sendNotification(McpSchema.METHOD_LOGGING_SET_LEVEL, params);
+	}
+
+	/**
+	 * This method is package-private and used for test only. Should not be called by user
+	 * code.
+	 * @param protocolVersions the Client supported protocol versions.
+	 */
+	void setProtocolVersions(List<String> protocolVersions) {
+		this.protocolVersions = protocolVersions;
 	}
 
 }

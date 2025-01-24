@@ -67,7 +67,6 @@ class McpClientFeatures {
 
 		/**
 		 * Create an instance and validate the arguments.
-		 * @param clientInfo the client implementation information.
 		 * @param clientCapabilities the client capabilities.
 		 * @param roots the roots.
 		 * @param toolsChangeConsumers the tools change consumers.
@@ -85,7 +84,6 @@ class McpClientFeatures {
 				Function<McpSchema.CreateMessageRequest, Mono<McpSchema.CreateMessageResult>> samplingHandler) {
 
 			Assert.notNull(clientInfo, "Client info must not be null");
-
 			this.clientInfo = clientInfo;
 			this.clientCapabilities = (clientCapabilities != null) ? clientCapabilities
 					: new McpSchema.ClientCapabilities(null,
@@ -182,7 +180,6 @@ class McpClientFeatures {
 				Function<McpSchema.CreateMessageRequest, McpSchema.CreateMessageResult> samplingHandler) {
 
 			Assert.notNull(clientInfo, "Client info must not be null");
-
 			this.clientInfo = clientInfo;
 			this.clientCapabilities = (clientCapabilities != null) ? clientCapabilities
 					: new McpSchema.ClientCapabilities(null,

@@ -123,11 +123,17 @@ public class McpAsyncServer {
 	private LoggingLevel minLoggingLevel = LoggingLevel.DEBUG;
 
 	/**
+	 * Supported protocol versions.
+	 */
+	private List<String> protocolVersions = List.of(McpSchema.LATEST_PROTOCOL_VERSION);
+
+	/**
 	 * Create a new McpAsyncServer with the given transport and capabilities.
 	 * @param mcpTransport The transport layer implementation for MCP communication.
 	 * @param features The MCP server supported features.
 	 */
 	McpAsyncServer(ServerMcpTransport mcpTransport, McpServerFeatures.Async features) {
+
 		this.serverInfo = features.serverInfo();
 		this.serverCapabilities = features.serverCapabilities();
 		this.tools.addAll(features.tools());
@@ -210,6 +216,7 @@ public class McpAsyncServer {
 			Map<String, ResourceRegistration> resources, List<McpSchema.ResourceTemplate> resourceTemplates,
 			Map<String, PromptRegistration> prompts, List<Consumer<List<McpSchema.Root>>> rootsChangeConsumers) {
 
+		this.protocolVersions = List.of(McpSchema.LATEST_PROTOCOL_VERSION);
 		this.serverInfo = serverInfo;
 		if (!Utils.isEmpty(tools)) {
 			this.tools.addAll(McpServer.mapDeprecatedTools(tools));
@@ -299,12 +306,18 @@ public class McpAsyncServer {
 					initializeRequest.protocolVersion(), initializeRequest.capabilities(),
 					initializeRequest.clientInfo());
 
-			if (!McpSchema.LATEST_PROTOCOL_VERSION.equals(initializeRequest.protocolVersion())) {
-				return Mono.error(new McpError(
-						"Unsupported protocol version from client: " + initializeRequest.protocolVersion()));
+			String serverProtocolVersion = this.protocolVersions.get(this.protocolVersions.size() - 1);
+
+			if (this.protocolVersions.contains(initializeRequest.protocolVersion())) {
+				serverProtocolVersion = initializeRequest.protocolVersion();
+			}
+			else {
+				logger.warn(
+						"Client requested unsupported protocol version: {}, so the server will sugggest the {} version instead",
+						initializeRequest.protocolVersion(), serverProtocolVersion);
 			}
 
-			return Mono.just(new McpSchema.InitializeResult(McpSchema.LATEST_PROTOCOL_VERSION, this.serverCapabilities,
+			return Mono.just(new McpSchema.InitializeResult(serverProtocolVersion, this.serverCapabilities,
 					this.serverInfo, null));
 		};
 	}
@@ -901,6 +914,15 @@ public class McpAsyncServer {
 		}
 		return this.mcpSession.sendRequest(McpSchema.METHOD_SAMPLING_CREATE_MESSAGE, createMessageRequest,
 				CREATE_MESSAGE_RESULT_TYPE_REF);
+	}
+
+	/**
+	 * This method is package-private and used for test only. Should not be called by user
+	 * code.
+	 * @param protocolVersions the Client supported protocol versions.
+	 */
+	void setProtocolVersions(List<String> protocolVersions) {
+		this.protocolVersions = protocolVersions;
 	}
 
 }

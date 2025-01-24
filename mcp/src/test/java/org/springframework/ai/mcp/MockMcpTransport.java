@@ -32,7 +32,10 @@ import org.springframework.ai.mcp.spec.McpSchema.JSONRPCNotification;
 import org.springframework.ai.mcp.spec.McpSchema.JSONRPCRequest;
 import org.springframework.ai.mcp.spec.ServerMcpTransport;
 
-@SuppressWarnings("unused")
+/**
+ * A mock implementation of the {@link ClientMcpTransport} and {@link ServerMcpTransport}
+ * interfaces.
+ */
 public class MockMcpTransport implements ClientMcpTransport, ServerMcpTransport {
 
 	private final AtomicInteger inboundMessageCount = new AtomicInteger(0);
@@ -91,6 +94,7 @@ public class MockMcpTransport implements ClientMcpTransport, ServerMcpTransport 
 			connected = false;
 			outgoing.tryEmitComplete();
 			inbound.tryEmitComplete();
+			// Wait for all subscribers to complete
 			return Mono.empty();
 		});
 	}

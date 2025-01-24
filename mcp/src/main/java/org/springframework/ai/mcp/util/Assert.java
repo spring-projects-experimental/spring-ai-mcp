@@ -16,11 +16,13 @@
 
 package org.springframework.ai.mcp.util;
 
+import java.util.Collection;
+
 import reactor.util.annotation.Nullable;
 
 /**
  * Assertion utility class that assists in validating arguments.
- * 
+ *
  * @author Christian Tzolov
  */
 
@@ -28,6 +30,18 @@ import reactor.util.annotation.Nullable;
  * Utility class providing assertion methods for parameter validation.
  */
 public final class Assert {
+
+	/**
+	 * Assert that the collection is not {@code null} and not empty.
+	 * @param collection the collection to check
+	 * @param message the exception message to use if the assertion fails
+	 * @throws IllegalArgumentException if the collection is {@code null} or empty
+	 */
+	public static void notEmpty(@Nullable Collection<?> collection, String message) {
+		if (collection == null || collection.isEmpty()) {
+			throw new IllegalArgumentException(message);
+		}
+	}
 
 	/**
 	 * Assert that an object is not {@code null}.
