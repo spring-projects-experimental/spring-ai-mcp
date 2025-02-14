@@ -1,3 +1,5 @@
+# NOTE: This project has been graduated and moved to the [MCP Java SDK](https://github.com/modelcontextprotocol/java-sdk/tree/main/mcp) and [Spring AI MCP](https://docs.spring.io/spring-ai/reference/api/mcp/mcp-overview.html). See you there! This repository is now archived. 
+
 # Java & Spring MCP
 [![Build Status](https://github.com/spring-projects-experimental/spring-ai-mcp/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/spring-projects-experimental/spring-ai-mcp/actions/workflows/continuous-integration.yml)
 
